@@ -1,87 +1,87 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import Navigation from '../components/Navigation';
-import { Post } from '../types';
+import { Post, RatingCategory } from '../types';
 import { AppContext } from '../App';
+import { PostService } from '../src/services/postService';
+import { TMDBService, TMDBSeries } from '../src/services/tmdbService';
+import { UserSeriesService } from '../src/services/userSeriesService';
 
-const INITIAL_POSTS: Post[] = [
-  {
-    id: 1,
-    user: {
-      name: 'João Silva',
-      handle: '@joaosilva',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA_jq2lRHGE0_I2jH9PqzBxrgXZdiEgLMItotFfMYjNmDr9U8rygcgN4epvFJ02K-hBmclGdGV4XHNkmsKdlUd9wwtNmyEB0lzdaVCq38lRvB7ksfT7uiJvroWGrlvOb1OBo3fuTz9KbwsQOpGypblqtxgrYaDYd_Zon3tKn0j7DNM47w-88ujavayHjWPowFS9bFS40En5gsjRMaFG1LjrYta6myAIuFGOobucDJCiDymf6c-1fiuUl4KHtgwSyCJvBTa36Kgazz5l'
-    },
-    timeAgo: '2h atrás',
-    content: 'Acabei de ver o final e estou sem palavras! A produção dessa temporada foi incrível. A trilha sonora, os efeitos visuais, tudo está em outro nível. Alguém mais achou o plot twist previsível, mas ainda assim satisfatório? 🎸🔥',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBUtVx1c6Ux5b3bem4nSY2tCLxL70ieNVEWFWp7sU2lDdK0_5cxHSu_EFyYp_8khdGZ7J-uddiIlQ2cDWEU_zx0ky0UPTaXYJiP5d6KrHS7Vbkn6iUkCIPaYhkxE_R10i_MAVh-QGHBcVTl4U1nU1V9DTCp_T1nZ6CjC9XKgkhaDvFoBE_DyHqRpTL1wKiBQm-7Sd7r4q-AMw6wKfKzzll-JVThA1sfd1aMV5ft_7dboXYGTGAQhWB-kyR4A-lbKJEchsUi8kzSOqp_',
-    tag: {
-      type: 'review',
-      text: 'Stranger Things - Temporada 4'
-    },
-    likes: 1200,
-    comments: 340,
-    shares: 56
-  },
-  {
-    id: 2,
-    user: {
-      name: 'Marina Costa',
-      handle: '',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBTG-V85C3JtMovKTdKEx9_1NpNFEiMyatRAnzbaA9THzmDp6qDmIVjedlGauzd2hAWb0Pw21BHfW69l4gijroTQsNiUkKR6b4mIs-g2n3TM9RZ_vSCFJnOZGrHkijOUmA1486psdmiIN0eSTP8o0sV0S5hUWikyn_NZs4WR3tk5BPzunmCFE1zx6xC7mCRSP490xFiilCWBajWX1h5q7HlRuZM5iFTaxVQ_pKM3PaKrAHMA_Z_d9UiCAdEYN3cXzxUNKSM0NV6GhiW'
-    },
-    timeAgo: '5h atrás',
-    content: 'O episódio 3 é simplesmente uma obra de arte. Chorei do início ao fim. Nunca pensei que uma adaptação de jogo pudesse ter tanta profundidade emocional. 😭❤️ #TheLastOfUs #HBO',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB4vOofD_IlvQAUTrfFKH6kf2hJ_hfKIhTYTqBQ5RVqkxmKOHOMANHl-Fmh32E0RwLkmhj6CPZ-Af2PRIHam6oIBK6FpuUEuh4hV6HNGhwWcrXyR4_O5kOysHGZO24ucRKzDgSsTnjkV88hS3DKsZhimzG1x2TBYLnPlTOQePeq_SIQI1OhNZTCBJIvBmr3VMA6f8sIqMK0eFHgN4lsCsmasmSBvFtReB4vod-nyNBnx6I3DLFyY_M3MAnT-eeL9KQ8Nip1PXq1-UFP',
-    tag: {
-      type: 'watching',
-      text: 'The Last of Us'
-    },
-    likes: 4500,
-    comments: 892,
-    shares: 210
-  },
-  {
-    id: 3,
-    user: {
-      name: 'Pedro Santos',
-      handle: '@pedro_s',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPSfk3wevAZBK4HJPiq3EnBDdXmdTvOnqArsdut-PzNk1u430a0iHUj3e08D6NjpjR_XLZKICGeQN1j8YN4ny9UUmgC2a4xO3AIKSssTDCzjE6zXAAffVOQN-t98Q8gYPtLo4OJhouW_wbztS-v9J71O79oLLfPa3KMV26zWEBtNHPYmCQszUoPq82RV6WEMYuORjrnoT2Zsl5Lm4IiOuFV3Ev5DneJ2O5LFHuTdkHsYdGADCPKgyTPT3KkhMd7YzscR91xdhQw1qq'
-    },
-    timeAgo: '30min atrás',
-    content: '',
-    isSpoiler: true,
-    spoilerTopic: 'Succession (S04E03)',
-    likes: 856,
-    comments: 120,
-    shares: 45
-  }
-];
+// Dados mockados removidos
+const INITIAL_POSTS: Post[] = [];
+
 
 const FeedPage: React.FC = () => {
   const { user } = useContext(AppContext);
-  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [trendingSeries, setTrendingSeries] = useState<TMDBSeries[]>([]);
   const [newPostContent, setNewPostContent] = useState('');
-  const [spoilerRevealed, setSpoilerRevealed] = useState<Record<number, boolean>>({});
+  const [newPostImage, setNewPostImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [spoilerRevealed, setSpoilerRevealed] = useState<Record<string, boolean>>({});
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePostSubmit = () => {
+  useEffect(() => {
+    loadFeed();
+    loadTrending();
+  }, []);
+
+  const loadFeed = async () => {
+    try {
+        const feed = await PostService.getFeed();
+        setPosts(feed as any); // Ajuste de tipagem pode ser necessário dependendo de como o Supabase retorna o join
+    } catch (error) {
+        console.error("Erro ao carregar feed:", error);
+    } finally {
+        setLoadingPosts(false);
+    }
+  };
+
+  const loadTrending = async () => {
+    const trending = await TMDBService.getTrendingSeries();
+    setTrendingSeries(trending.slice(0, 5));
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setNewPostImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handlePostSubmit = async () => {
     if (!newPostContent.trim()) return;
+    setSubmitting(true);
 
-    const newPost: Post = {
-      id: Date.now(),
-      user: user, // Usando o usuário do contexto
-      timeAgo: 'Agora mesmo',
-      content: newPostContent,
-      likes: 0,
-      comments: 0,
-      shares: 0
-    };
-
-    setPosts([newPost, ...posts]);
-    setNewPostContent('');
+    try {
+        await PostService.createPost(user.id, newPostContent, newPostImage);
+        setNewPostContent('');
+        setNewPostImage(null);
+        setImagePreview(null);
+        loadFeed(); // Recarregar feed
+    } catch (error) {
+        alert('Erro ao criar post: ' + (error as any).message);
+    } finally {
+        setSubmitting(false);
+    }
   };
 
   const toggleSpoiler = (id: number) => {
     setSpoilerRevealed(prev => ({...prev, [id]: !prev[id]}));
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta publicação?')) return;
+    try {
+        await PostService.deletePost(postId);
+        setPosts(posts.filter(p => p.id !== postId));
+        setActiveMenuId(null);
+    } catch (error: any) {
+        alert('Erro ao excluir: ' + error.message);
+    }
   };
 
   const toggleLike = (id: number) => {
@@ -92,7 +92,19 @@ const FeedPage: React.FC = () => {
       return post;
     }));
   };
-
+  const [activeTab, setActiveTab] = useState<RatingCategory>('Recomendadas');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newReview, setNewReview] = useState<{
+    title: string;
+    image: string;
+    category: RatingCategory;
+    comment: string;
+  }>({
+    title: '',
+    image: '',
+    category: 'Recomendadas',
+    comment: ''
+  });  
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark transition-colors duration-300 pb-20 md:pb-0">
       <Navigation page="feed" />
@@ -123,11 +135,22 @@ const FeedPage: React.FC = () => {
                     value={newPostContent}
                     onChange={(e) => setNewPostContent(e.target.value)}
                   ></textarea>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button className="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors" title="Adicionar Imagem">
-                        <span className="material-symbols-outlined text-[22px]">image</span>
-                      </button>
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-2">
+                       <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={handleImageChange}
+                       />
+                       <button 
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`p-2 rounded-full transition-colors ${newPostImage ? 'text-green-500 bg-green-50' : 'text-primary hover:bg-primary/10'}`} 
+                          title="Adicionar Imagem"
+                       >
+                         <span className="material-symbols-outlined text-[22px]">{newPostImage ? 'check_circle' : 'image'}</span>
+                       </button>
                       <button className="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors" title="Marcar Série">
                         <span className="material-symbols-outlined text-[22px]">movie</span>
                       </button>
@@ -180,10 +203,28 @@ const FeedPage: React.FC = () => {
                       <span className="material-symbols-outlined text-[14px]">warning</span> Spoiler
                     </span>
                   )}
-                  <button className="text-slate-500 dark:text-text-secondary hover:text-slate-900 dark:hover:text-white">
-                    <span className="material-symbols-outlined">more_horiz</span>
-                  </button>
-                </div>
+                   <div className="relative">
+                     <button 
+                        onClick={() => setActiveMenuId(activeMenuId === post.id ? null : post.id)}
+                        className="text-slate-500 dark:text-text-secondary hover:text-slate-900 dark:hover:text-white"
+                     >
+                       <span className="material-symbols-outlined">more_horiz</span>
+                     </button>
+                     {activeMenuId === post.id && (
+                        <div className="absolute right-0 top-8 bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border rounded-lg shadow-xl z-20 min-w-[140px] overflow-hidden">
+                            <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-lg">edit</span> Editar
+                            </button>
+                            <button 
+                                onClick={() => handleDeletePost(post.id)}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-lg">delete</span> Excluir
+                            </button>
+                        </div>
+                     )}
+                   </div>
+                 </div>
 
                 {/* Content */}
                 {post.isSpoiler && !spoilerRevealed[post.id] ? (
@@ -207,8 +248,12 @@ const FeedPage: React.FC = () => {
                      {post.content && <p className="text-slate-700 dark:text-gray-300 text-sm leading-relaxed mb-4">{post.content}</p>}
                      
                      {post.image && (
-                       <div className="relative w-full aspect-video md:aspect-[21/9] rounded-lg overflow-hidden mb-4 group cursor-pointer">
-                          <div className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url('${post.image}')` }}></div>
+                       <div className="relative w-full rounded-lg overflow-hidden mb-4 group border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-black">
+                          <img 
+                            src={post.image} 
+                            alt="Post content" 
+                            className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                          />
                           {post.tag?.type === 'review' && (
                             <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1">
                               <span className="material-symbols-outlined text-[14px] text-primary">star</span> Review
@@ -249,36 +294,32 @@ const FeedPage: React.FC = () => {
           <aside className="hidden lg:flex flex-col col-span-4 gap-6">
             
             {/* Trending */}
+            {/* Trending */}
             <div className="bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-surface-border p-5 shadow-sm dark:shadow-lg transition-colors duration-300">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-slate-900 dark:text-white font-bold text-lg">Em Alta na Semana</h3>
                 <a className="text-primary text-xs font-bold hover:underline" href="#">Ver tudo</a>
               </div>
               <div className="flex flex-col gap-4">
-                <div className="flex gap-3 items-center group cursor-pointer">
-                  <div className="w-12 h-16 rounded bg-cover bg-center shrink-0" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCJc_a_Epe_YhAABaBvAeCt36eQZIOPj-I9DMuuKJIcuhbg8gL4q9cL52gKY7u71e0qIlEwEyCL2uZyAi1NZb619QXTNEZGJ2rrEWzhKNHheME_PbHNVlQgFUB81v4zu0HOZZ6yq0_X1CZYOzSAB8F0aqyyAXRgeXAL7u4jIl596P8v3rlqn8D3mFrhIDXQqShVA4AgI2UACjFy6xSD84RlwWUwygGC8a1oR8LXABVfg541YrDgUmlnn9mKokvm4fa_ebiIEjesadXm')" }}></div>
-                  <div className="flex flex-col flex-1">
-                    <h4 className="text-slate-900 dark:text-white font-bold text-sm group-hover:text-primary transition-colors">House of the Dragon</h4>
-                    <span className="text-slate-500 dark:text-text-secondary text-xs">Fantasia • HBO</span>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="material-symbols-outlined text-yellow-500 text-[14px] filled">star</span>
-                      <span className="text-slate-900 dark:text-white text-xs font-bold">9.2</span>
+                {trendingSeries.map((series, index) => (
+                    <div key={series.id} className="flex gap-3 items-center group cursor-pointer">
+                    <div className="w-12 h-16 rounded bg-cover bg-center shrink-0" style={{ backgroundImage: `url('${TMDBService.getImageUrl(series.poster_path)}')` }}></div>
+                    <div className="flex flex-col flex-1">
+                        <h4 className="text-slate-900 dark:text-white font-bold text-sm group-hover:text-primary transition-colors line-clamp-1">{series.name}</h4>
+                        <span className="text-slate-500 dark:text-text-secondary text-xs truncate">{series.first_air_date?.split('-')[0] || 'N/A'}</span>
+                        <div className="flex items-center gap-1 mt-1">
+                        <span className="material-symbols-outlined text-yellow-500 text-[14px] filled">star</span>
+                        <span className="text-slate-900 dark:text-white text-xs font-bold">{series.vote_average.toFixed(1)}</span>
+                        </div>
                     </div>
-                  </div>
-                  <span className="text-slate-400 dark:text-slate-500 text-lg font-bold">01</span>
-                </div>
-                 <div className="flex gap-3 items-center group cursor-pointer">
-                  <div className="w-12 h-16 rounded bg-cover bg-center shrink-0" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCOsTOaFY08jzkThO2P9rffgdwWNvqYHYYXondU0db6R_xULIut6DUDgn8ltlsm7FCSOKKrQd9iE2XSlVEQciV65RsHGLknK9A62j_9UulkAx8Rm0eFw2j9TUpQzNEuSv3Khmn3aFgNp5Tu8Q1FZEoz2Xrj-4sv4UseiI2F2Go28rpRYUYhgWhZf5auWHP9TFTxaLXhVhdoDyCUnP-Rd2cRmtiyf_TjNoIgyCDxUUnJZS9IYL3q_iQbMw8Wc-ZV8tUxq-Jz-oNWgX3R')" }}></div>
-                  <div className="flex flex-col flex-1">
-                    <h4 className="text-slate-900 dark:text-white font-bold text-sm group-hover:text-primary transition-colors">Severance</h4>
-                    <span className="text-slate-500 dark:text-text-secondary text-xs">Sci-Fi • Apple TV+</span>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="material-symbols-outlined text-yellow-500 text-[14px] filled">star</span>
-                      <span className="text-slate-900 dark:text-white text-xs font-bold">8.9</span>
+                    <button 
+                        onClick={() => UserSeriesService.addSeries(user.id, series).then(() => alert('Série adicionada!')).catch(e => alert(e.message))}
+                        className="text-slate-400 dark:text-slate-500 hover:text-primary transition-colors"
+                    >
+                        <span className="material-symbols-outlined">add_circle</span>
+                    </button>
                     </div>
-                  </div>
-                  <span className="text-slate-400 dark:text-slate-500 text-lg font-bold">02</span>
-                </div>
+                ))}
               </div>
             </div>
 

@@ -1,12 +1,54 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../src/lib/supabase';
+import { ProfileService } from '../src/services/profileService';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false); // Novo estado
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/feed');
+    setLoading(true);
+    
+    let result;
+    if (isSignUp) {
+        result = await supabase.auth.signUp({
+            email,
+            password,
+        });
+    } else {
+        result = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+    }
+
+    const { data, error } = result;
+    setLoading(false);
+
+    if (error) {
+      alert('Erro: ' + error.message);
+    } else {
+      if (isSignUp) {
+          // Criar perfil com dados básicos
+          if (data?.user) {
+              try {
+                  await ProfileService.createProfile(data.user.id, email);
+                  alert('Cadastro realizado! Faça login para entrar.');
+                  setIsSignUp(false);
+              } catch (profileError) {
+                  console.error(profileError);
+                  alert('Conta criada, mas houve um erro ao criar o perfil. Entre em contato com o suporte.');
+              }
+          }
+      } else {
+          navigate('/feed');
+      }
+    }
   };
 
   return (
@@ -46,13 +88,17 @@ const LoginPage: React.FC = () => {
 
         <div className="w-full max-w-[440px]">
           <div className="text-center lg:text-left mb-10">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">Bem-vindo de volta!</h1>
-            <p className="text-gray-600 dark:text-text-muted text-base">Conecte-se com outros fãs de séries.</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
+                {isSignUp ? 'Crie sua conta' : 'Bem-vindo de volta!'}
+            </h1>
+            <p className="text-gray-600 dark:text-text-muted text-base">
+                {isSignUp ? 'Junte-se a comunidade de críticos.' : 'Conecte-se com outros fãs de séries.'}
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleAuth} className="space-y-6">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-900 dark:text-white ml-1">E-mail ou nome de usuário</label>
+              <label className="block text-sm font-medium text-gray-900 dark:text-white ml-1">E-mail</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-gray-400 dark:text-text-muted group-focus-within:text-primary transition-colors">mail</span>
@@ -60,8 +106,10 @@ const LoginPage: React.FC = () => {
                 <input 
                   className="block w-full pl-11 pr-4 py-3.5 bg-white dark:bg-surface-dark border border-gray-200 dark:border-border-dark rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200" 
                   placeholder="ex: usuario@email.com" 
-                  type="text" 
-                  defaultValue="demo@maratonei.com"
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                 />
               </div>
             </div>
@@ -69,7 +117,9 @@ const LoginPage: React.FC = () => {
             <div className="space-y-2">
               <div className="flex items-center justify-between ml-1">
                 <label className="block text-sm font-medium text-gray-900 dark:text-white">Senha</label>
-                <a className="text-sm font-medium text-primary hover:text-primary/80 transition-colors underline-offset-2 hover:underline" href="#">Esqueci minha senha</a>
+               {!isSignUp && (
+                 <a className="text-sm font-medium text-primary hover:text-primary/80 transition-colors underline-offset-2 hover:underline" href="#">Esqueci minha senha</a>
+               )}
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -79,7 +129,10 @@ const LoginPage: React.FC = () => {
                   className="block w-full pl-11 pr-12 py-3.5 bg-white dark:bg-surface-dark border border-gray-200 dark:border-border-dark rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200" 
                   placeholder="Digite sua senha" 
                   type="password" 
-                  defaultValue="password123"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
                 />
                 <button className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 dark:text-text-muted hover:text-gray-600 dark:hover:text-white focus:outline-none transition-colors" type="button">
                   <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>visibility_off</span>
@@ -88,10 +141,11 @@ const LoginPage: React.FC = () => {
             </div>
 
             <button 
-              className="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-xl shadow-lg shadow-primary/25 text-base font-bold text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-background-dark transition-all duration-200 transform active:scale-[0.98]" 
+              className="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-xl shadow-lg shadow-primary/25 text-base font-bold text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-background-dark transition-all duration-200 transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed" 
               type="submit"
+              disabled={loading}
             >
-              Entrar
+              {loading ? 'Processando...' : (isSignUp ? 'Criar Conta' : 'Entrar')}
             </button>
           </form>
 
@@ -122,8 +176,14 @@ const LoginPage: React.FC = () => {
           </div>
 
           <p className="mt-10 text-center text-sm text-gray-600 dark:text-text-muted">
-            Ainda não tem conta? 
-            <a className="font-bold text-primary hover:text-primary/80 transition-colors ml-1" href="#">Criar conta</a>
+            {isSignUp ? 'Já tem uma conta?' : 'Ainda não tem conta?'}
+            <button 
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="font-bold text-primary hover:text-primary/80 transition-colors ml-1 focus:outline-none"
+            >
+                {isSignUp ? 'Fazer Login' : 'Criar conta'}
+            </button>
           </p>
         </div>
       </div>
@@ -132,3 +192,5 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
+
+// export default LoginPage; removido duplicado

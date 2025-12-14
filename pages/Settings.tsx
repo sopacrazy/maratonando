@@ -1,10 +1,17 @@
 import React, { useContext, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import { AppContext } from '../App';
 import { ProfileTheme } from '../types';
 
 const SettingsPage: React.FC = () => {
   const { user, updateUser, theme, toggleTheme } = useContext(AppContext);
+  const navigate = useNavigate();
+  
+  const handleLogout = () => {
+    // Aqui poderia limpar o estado do usuário, mas como é mockado, apenas redirecionamos
+    navigate('/');
+  };
   
   // Estado local para o formulário
   const [formData, setFormData] = useState({
@@ -187,9 +194,19 @@ const SettingsPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-200 dark:border-[#362348] flex justify-end gap-4">
-                <button type="button" className="px-6 py-2 text-slate-700 dark:text-white font-medium hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">Cancelar</button>
-                <button type="submit" className="px-6 py-2 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 shadow-lg shadow-primary/20 transition-transform active:scale-95">Salvar Alterações</button>
+            <div className="pt-4 border-t border-gray-200 dark:border-[#362348] flex justify-between gap-4">
+                <button 
+                  type="button" 
+                  onClick={handleLogout}
+                  className="px-6 py-2 border border-red-200 text-red-600 dark:text-red-400 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/10 font-bold rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">logout</span>
+                  Sair da Conta
+                </button>
+                <div className="flex gap-4">
+                    <button type="button" className="px-6 py-2 text-slate-700 dark:text-white font-medium hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">Cancelar</button>
+                    <button type="submit" className="px-6 py-2 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 shadow-lg shadow-primary/20 transition-transform active:scale-95">Salvar Alterações</button>
+                </div>
             </div>
 
           </form>

@@ -1,7 +1,10 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import { AppContext } from '../App';
-import { RatingCategory, SeriesReview } from '../types';
+import { RatingCategory, SeriesReview, Post } from '../types';
+import { UserSeriesService, UserSeries } from '../src/services/userSeriesService';
+import { PostService } from '../src/services/postService';
+import { TMDBService } from '../src/services/tmdbService';
 
 // Componente para o efeito de neve
 const SnowEffect = () => {
@@ -49,9 +52,19 @@ const SnowEffect = () => {
 };
 
 const ProfilePage: React.FC = () => {
-  const { user, addSeriesReview, theme } = useContext(AppContext);
+  const { user, theme } = useContext(AppContext);
   const [stampsExpanded, setStampsExpanded] = useState(false);
   const [postsExpanded, setPostsExpanded] = useState(false);
+  const [userSeries, setUserSeries] = useState<UserSeries[]>([]);
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+
+  useEffect(() => {
+    if (user?.id) {
+        UserSeriesService.getUserSeries(user.id).then(setUserSeries);
+        // Implementar busca de posts do usuário se necessário, ou filtrar do feed
+        // PostService.getUserPosts(user.id)... (assumindo que vamos adicionar isso)
+    }
+  }, [user?.id]);
   
   const [activeTab, setActiveTab] = useState<RatingCategory>('Recomendadas');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -67,13 +80,28 @@ const ProfilePage: React.FC = () => {
     comment: ''
   });
 
-  const filteredSeries = user.watchedSeries?.filter(s => s.category === activeTab) || [];
 
-  const handleAddReview = (e: React.FormEvent) => {
+
+  // Filtrar userSeries (backend) em vez de user.watchedSeries (contexto/mock)
+  // Como o backend ainda não tem categoria para todas, vamos adaptar ou usar status
+  // Por enquanto, vou mapear tudo para exibição e usar um filtro simples ou mostrar tudo se categoria não bater
+  const filteredSeries = userSeries; // Simplificação temporária: mostra todas as séries adicionadas
+
+  const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newReview.title || !newReview.comment) return;
-    const review: SeriesReview = { id: Date.now(), ...newReview };
-    addSeriesReview(review);
+    if (!newReview.title) return;
+    
+    // Buscar série no TMDB pelo título para pegar ID e imagem corretos
+    const searchResults = await TMDBService.searchSeries(newReview.title);
+    if (searchResults.length > 0) {
+        const series = searchResults[0];
+        await UserSeriesService.addSeries(user.id, series, 'watching'); // Default status
+        // Recarregar lista
+        UserSeriesService.getUserSeries(user.id).then(setUserSeries);
+    } else {
+        alert('Série não encontrada no TMDB.');
+    }
+
     setIsModalOpen(false);
     setNewReview({ title: '', image: '', category: 'Recomendadas', comment: '' });
   };
@@ -249,18 +277,18 @@ const ProfilePage: React.FC = () => {
               {/* Series Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  {filteredSeries.length > 0 ? (
-                    filteredSeries.map(series => (
-                      <div key={series.id} className="flex gap-3 p-3 rounded-lg bg-gray-50 dark:bg-[#1a1122] border border-gray-200 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 transition-colors">
-                         <div className="w-16 h-24 sm:w-20 sm:h-28 shrink-0 bg-cover bg-center rounded-md shadow-sm" style={{ backgroundImage: `url('${series.image || "https://placeholder.pics/svg/300" }')` }}></div>
-                         <div className="flex flex-col min-w-0">
-                            <h3 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg leading-tight mb-1 truncate">{series.title}</h3>
-                            <div className={`text-[10px] font-bold uppercase tracking-wider mb-2 px-2 py-0.5 rounded w-fit ${getCategoryColor(series.category)}`}>
-                              {series.category}
-                            </div>
-                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 italic line-clamp-3">"{series.comment}"</p>
-                         </div>
-                      </div>
-                    ))
+                     filteredSeries.map(series => (
+                       <div key={series.id} className="flex gap-3 p-3 rounded-lg bg-gray-50 dark:bg-[#1a1122] border border-gray-200 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 transition-colors">
+                          <div className="w-16 h-24 sm:w-20 sm:h-28 shrink-0 bg-cover bg-center rounded-md shadow-sm" style={{ backgroundImage: `url('${TMDBService.getImageUrl(series.poster_path)}')` }}></div>
+                          <div className="flex flex-col min-w-0">
+                             <h3 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg leading-tight mb-1 truncate">{series.title}</h3>
+                             <div className={`text-[10px] font-bold uppercase tracking-wider mb-2 px-2 py-0.5 rounded w-fit ${getCategoryColor('Recomendadas')}`}>
+                               {series.status === 'watching' ? 'Assistindo' : series.status}
+                             </div>
+                             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 italic line-clamp-3">"{series.review || 'Sem crítica'}"</p>
+                          </div>
+                       </div>
+                     ))
                  ) : (
                    <div className="col-span-full py-10 text-center text-slate-400 dark:text-text-secondary">
                       <span className="material-symbols-outlined text-4xl mb-2 opacity-50">movie_off</span>

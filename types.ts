@@ -21,10 +21,10 @@ export interface User {
 }
 
 export interface Post {
-  id: number;
+  id: string | number;
   user: User;
   content: string;
-  image?: string;
+  image?: string | null; // Compatível com image_url (nullable)
   timeAgo: string;
   likes: number;
   comments: number;

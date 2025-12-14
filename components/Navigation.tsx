@@ -1,6 +1,8 @@
-import React, { useContext } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppContext } from '../App';
+import { TMDBService, TMDBSeries } from '../src/services/tmdbService';
+import { UserSeriesService } from '../src/services/userSeriesService';
 
 interface NavigationProps {
   page: 'feed' | 'profile' | 'market' | 'settings';
@@ -9,6 +11,58 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ page }) => {
   const location = useLocation();
   const { coins, user } = useContext(AppContext);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<TMDBSeries[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [userSeriesIds, setUserSeriesIds] = useState<Set<number>>(new Set());
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Carregar IDs das séries do usuário para verificação rápida
+  useEffect(() => {
+    if (user?.id) {
+        UserSeriesService.getUserSeries(user.id).then(series => {
+            setUserSeriesIds(new Set(series.map(s => s.tmdb_id)));
+        });
+    }
+  }, [user?.id]);
+
+  // Fechar busca ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setSearchResults([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    if (query.length > 2) {
+      setIsSearching(true);
+      const results = await TMDBService.searchSeries(query);
+      setSearchResults(results.slice(0, 5));
+      setIsSearching(false);
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  const handleAddSeries = async (series: TMDBSeries) => {
+    if (!user?.id) return alert('Faça login para adicionar séries');
+    try {
+        await UserSeriesService.addSeries(user.id, series);
+        // Atualizar lista local de IDs
+        setUserSeriesIds(prev => new Set(prev).add(series.id));
+        alert(`${series.name} adicionada à sua lista!`);
+        setSearchResults([]);
+        setSearchQuery('');
+    } catch (e: any) {
+        alert(e.message);
+    }
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -42,16 +96,44 @@ const Navigation: React.FC<NavigationProps> = ({ page }) => {
             </Link>
             
             {/* Search Bar - Oculto em telas muito pequenas */}
-            <div className="hidden sm:flex flex-col flex-1 max-w-96 min-w-[200px] !h-10">
-              <div className="flex w-full flex-1 items-stretch rounded-lg h-full bg-gray-100 dark:bg-[#362348] hover:bg-gray-200 dark:hover:bg-[#432b5a] transition-colors group">
+            <div className="hidden sm:flex flex-col flex-1 max-w-96 min-w-[200px] relative" ref={searchRef}>
+              <div className="flex w-full flex-1 items-stretch rounded-lg h-10 bg-gray-100 dark:bg-[#362348] hover:bg-gray-200 dark:hover:bg-[#432b5a] transition-colors group">
                 <div className="text-gray-400 dark:text-[#ad92c9] flex border-none items-center justify-center pl-3 pr-2">
                   <span className="material-symbols-outlined text-xl">search</span>
                 </div>
                 <input 
                   className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-900 dark:text-white focus:outline-0 focus:ring-0 border-none bg-transparent focus:border-none h-full placeholder:text-gray-400 dark:placeholder:text-[#ad92c9] px-0 text-sm font-normal leading-normal" 
-                  placeholder="Buscar..." 
+                  placeholder="Buscar série..." 
+                  value={searchQuery}
+                  onChange={handleSearch}
                 />
               </div>
+
+              {/* Dropdown de Resultados */}
+              {searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-surface-dark rounded-xl shadow-xl border border-gray-200 dark:border-white/10 overflow-hidden z-50">
+                  {searchResults.map(series => (
+                    <div key={series.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer border-b border-gray-100 dark:border-white/5 last:border-0">
+                      <div className="w-10 h-14 rounded bg-cover bg-center shrink-0" style={{ backgroundImage: `url('${TMDBService.getImageUrl(series.poster_path)}')` }}></div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">{series.name}</h4>
+                        <span className="text-xs text-slate-500 dark:text-text-secondary">{series.first_air_date?.split('-')[0] || 'N/A'}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (userSeriesIds.has(series.id)) return;
+                            handleAddSeries(series);
+                        }}
+                        className={`p-2 rounded-full transition-colors ${userSeriesIds.has(series.id) ? 'text-green-500 bg-green-50 cursor-default' : 'text-primary hover:bg-primary/10'}`}
+                        title={userSeriesIds.has(series.id) ? "Já adicionada" : "Adicionar à lista"}
+                      >
+                         <span className="material-symbols-outlined text-xl">{userSeriesIds.has(series.id) ? 'check' : 'add_circle'}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

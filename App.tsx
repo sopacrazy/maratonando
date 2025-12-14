@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { supabase } from './src/lib/supabase';
+import { ProfileService } from './src/services/profileService';
 import LoginPage from './pages/Login';
 import FeedPage from './pages/Feed';
 import ProfilePage from './pages/Profile';
@@ -19,7 +21,7 @@ export const AppContext = React.createContext<{
 }>({ 
   coins: 2450, 
   setCoins: () => {},
-  theme: 'dark',
+  theme: 'light',
   toggleTheme: () => {},
   user: { name: '', handle: '', avatar: '' },
   updateUser: () => {},
@@ -28,39 +30,61 @@ export const AppContext = React.createContext<{
 
 export default function App() {
   const [coins, setCoins] = useState(2450);
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   // Estado do Usuário Logado com dados iniciais
+  // Inicialmente null até verificar sessão
   const [user, setUser] = useState<User>({
-    name: 'Fernanda Silva',
-    handle: '@fernanda_series',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDrQGhtY4i1s8y7omlVlPPQjQAG0dYUQojKeH_nCuLKpDdng3C16Ut3-KLhNx1i7CGpd6TzJLz7SCMybx2-52S2hqQbBuToWGiI3_HjD3XCWJv4RGq6NW0BEUWeRtJt7ci2O8Nl27N76HwT-oTueUu512PJb_apGa_-NYh05dkfWoYDUwtaUXy92XHVqM6i_L8klNF4aItW-h36uv-exk3pa3uN-ZNwGmVNTo8ENHQ-jC3xOqZXTEQOkGPZdZ4un4_scgAAAx8XC5vp',
-    bio: 'Cinéfila, maratonista de séries e crítica amadora nas horas vagas. Apaixonada por sci-fi, mistérios e dramas históricos. Atualmente reassistindo Lost pela 3ª vez! ✈️🏝️',
-    profileTheme: 'default', // Tema inicial
-    watchedSeries: [
-      {
-        id: 1,
-        title: 'Breaking Bad',
-        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAOlvDv-eVVWnD0BkYVw7Eok5g98nI4Bxq6vkgid_FwqNo3kbLK07BFSATLz0tIDcQ-qRMPqvDXOB02-Hwzllx2JPspQRPqQKbqzJajmFHCHoq0LrBPv6KVFYWO6-se3gQKWDsR3Hv_R8_xMRa235kQfgoqy7AxGGnIWLW9o_RuKV7Zjov6CA9SkQ1oW2q-n9QR2pP_2S6c_RVSVncr3GqQpvbY3rpZrY97M6cvCQAJtAlvS2-R6ER1sX-WLSOx-Xw1GczcLLJdSOtw',
-        category: 'Recomendadas',
-        comment: 'Simplesmente a melhor série já feita. Roteiro impecável.'
-      },
-      {
-        id: 2,
-        title: 'Emily in Paris',
-        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCA81qhY1Mc5nRbdD90bN5q2SofhBRBNSVQmP50z8FxTyponHBnTAdGCwMfmvCal-klFyW9C8Skf7zowJQj0zmYCg--FVlpodNbNbIHgMf9QMM7c56nPhZFiH_3AfJUOL_wFYdLfxDLElAs5aQ3AvOuMuTQp6Un5OAn5Hee-hqs6Z4LC7UjKquGbvFLnhbDuTSFR4T1e9J1kGeFX3jzD_1C1q-Eeky5uR3znXotCf2Jlu8hHv7_35lsbt3eLWNoXNZBu4gvABVb989G',
-        category: 'Passa tempo',
-        comment: 'Roteiro fraco, mas as roupas são bonitas e distrai a cabeça.'
-      },
-      {
-        id: 3,
-        title: 'Velma',
-        image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDsvJ0QMYynr88jNMFc6CkBXV80EDrmOxrrsTc2hFjoRNgRfK7sb5VBesdnqeHziJWvpEvDLYWsmuragrrCY5kRHYEg9SRwMTT49DyUBxgDWKt47JOxfCuATft-SVr06-895nnSdZF3P1MVFABQICdT58dUxOA6vAlcAcvLYKu0qrjdlprQPwgYQ9A9vhVBk-hyElzBSvlN0nzLuSfDf2_-0IbFF1EgpPWe4TiQEmx-LEbtISEWqc1lAnL5hljLgAt_3zNot4Z46YPD',
-        category: 'Perdi meu tempo',
-        comment: 'Descaracterizaram tudo. Não consegui passar do segundo episódio.'
-      }
-    ]
+     name: 'Visitante',
+     handle: '',
+     avatar: 'https://placeholder.pics/svg/150',
+     bio: '',
+     watchedSeries: []
   });
+
+  useEffect(() => {
+    // Verificar sessão atual
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+         // Carregar dados reais do perfil
+         ProfileService.getProfile(session.user.id)
+            .then(profile => {
+                if (profile) {
+                    setUser(prev => ({ ...prev, ...profile }));
+                    setCoins(profile.coins || 2450);
+                    if (profile.profile_theme) {
+                        // Poderíamos aplicar o tema do perfil aqui se desejado
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Erro ao carregar perfil:', err);
+                // Fallback para dados da sessão se não tiver perfil
+                setUser(prev => ({ 
+                    ...prev, 
+                    name: session.user.email?.split('@')[0] || 'User', 
+                    handle: session.user.email || '' 
+                }));
+            });
+      }
+    });
+
+    // Escutar mudanças de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+         ProfileService.getProfile(session.user.id).then(profile => {
+             if (profile) {
+                 setUser(prev => ({ ...prev, ...profile }));
+                 setCoins(profile.coins || 2450);
+             }
+         });
+      } else {
+         // Reset ou redirect poderia acontecer aqui
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const root = window.document.documentElement;
