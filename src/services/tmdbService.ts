@@ -48,5 +48,15 @@ export const TMDBService = {
       console.error("Erro ao buscar detalhes da série:", error);
       return null;
     }
+  },
+
+  getSeriesSeason: async (seriesId: number, seasonNumber: number) => {
+    try {
+      const response = await fetch(`${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=pt-BR`);
+      return await response.json();
+    } catch (error) {
+      console.error("Erro ao buscar temporada:", error);
+      return null;
+    }
   }
 };

@@ -23,16 +23,16 @@
         theme: {
           extend: {
             colors: {
-              "primary": "#7f13ec",
+              "primary": "#ff6b35", // Laranja amanhecer
               "background-light": "#f7f6f8",
-              "background-dark": "#191022",
+              "background-dark": "#0a0a0a", // zinc-950
               "surface-light": "#ffffff",
-              "surface-dark": "#261933",
-              "surface-border": "#4d3267",
-              "border-dark": "#4d3267",
-              "card-dark": "#2a1f33",
-              "text-secondary": "#ad92c9",
-              "text-muted": "#ad92c9",
+              "surface-dark": "#18181b", // zinc-900
+              "surface-border": "#3f3f46", // zinc-700
+              "border-dark": "#3f3f46", // zinc-700
+              "card-dark": "#18181b", // zinc-900
+              "text-secondary": "#a1a1aa", // zinc-400
+              "text-muted": "#a1a1aa", // zinc-400
             },
             fontFamily: {
               "display": ["Be Vietnam Pro", "sans-serif"]
@@ -61,6 +61,39 @@
           -ms-overflow-style: none;
           scrollbar-width: none;
       }
+      /* Mobile Optimizations */
+      .touch-manipulation {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Safe area for mobile notches */
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      /* Better text rendering on mobile */
+      @media (max-width: 640px) {
+        body {
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+        /* Prevent zoom on input focus (iOS) */
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        textarea {
+          font-size: 16px !important;
+        }
+      }
+      /* Smooth scrolling */
+      html {
+        scroll-behavior: smooth;
+      }
+      /* Better focus states for mobile */
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid #ff6b35;
+        outline-offset: 2px;
+      }
     </style>
   <script type="importmap">
 {
@@ -72,10 +105,10 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+
 </head>
   <body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-x-hidden antialiased transition-colors duration-300">
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
+  <script type="module" src="/src/index.tsx"></script>
 </body>
 </html>

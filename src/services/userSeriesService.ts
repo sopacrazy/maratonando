@@ -19,30 +19,38 @@ export const UserSeriesService = {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
     return data as UserSeries[];
   },
 
-  async addSeries(userId: string, series: TMDBSeries, status: UserSeries['status'] = 'watching') {
+  async addSeries(userId: string, series: TMDBSeries, status: UserSeries['status'] = 'watching', review?: string, rating?: number) {
     const { data, error } = await supabase
       .from('user_series')
-      .insert({
+      .upsert({
         user_id: userId,
         tmdb_id: series.id,
         title: series.name,
         poster_path: series.poster_path,
-        status
-      })
+        status,
+        review,
+        rating // Usaremos rating para mapear a categoria (3=Recomendada, 2=Passatempo, 1=Perda de tempo)
+      }, { onConflict: 'user_id, tmdb_id' })
       .select()
       .single();
 
     if (error) {
-        if (error.code === '23505') {
-            throw new Error('Você já adicionou esta série.');
-        }
-        throw error;
+      throw error;
     }
     return data;
+  },
+
+  async removeSeries(seriesId: string) {
+    const { error } = await supabase
+      .from('user_series')
+      .delete()
+      .eq('id', seriesId);
+
+    if (error) throw error;
   }
 };

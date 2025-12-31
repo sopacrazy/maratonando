@@ -1,18 +1,40 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../src/lib/supabase';
-import { ProfileService } from '../src/services/profileService';
+import { supabase } from '../lib/supabase';
+import { ProfileService } from '../services/profileService';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  // Credenciais de teste pré-preenchidas
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false); // Novo estado
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    if (isSignUp) {
+        if (password !== confirmPassword) {
+            setError('As senhas não coincidem!');
+            setLoading(false);
+            return;
+        }
+
+        const hasNumber = /\d/.test(password);
+        if (password.length < 6 || !hasNumber) {
+            setError('A senha deve ter no mínimo 6 caracteres e conter pelo menos um número.');
+            setLoading(false);
+            return;
+        }
+    }
     
     let result;
     if (isSignUp) {
@@ -27,22 +49,29 @@ const LoginPage: React.FC = () => {
         });
     }
 
-    const { data, error } = result;
+    const { data, error: authError } = result;
     setLoading(false);
 
-    if (error) {
-      alert('Erro: ' + error.message);
+    if (authError) {
+      if (authError.message === 'User already registered') {
+         setError('Este e-mail já está cadastrado. Tente fazer login.');
+      } else if (authError.message === 'Invalid login credentials') {
+         setError('E-mail ou senha incorretos.');
+      } else {
+         setError('Erro: ' + authError.message);
+      }
     } else {
       if (isSignUp) {
-          // Criar perfil com dados básicos
           if (data?.user) {
               try {
                   await ProfileService.createProfile(data.user.id, email);
-                  alert('Cadastro realizado! Faça login para entrar.');
+                  // Forçar logout para que o usuário faça login manualmente
+                  await supabase.auth.signOut();
+                  setSuccess('Cadastro realizado com sucesso! Faça login para entrar.');
                   setIsSignUp(false);
               } catch (profileError) {
                   console.error(profileError);
-                  alert('Conta criada, mas houve um erro ao criar o perfil. Entre em contato com o suporte.');
+                  setError('Conta criada, mas houve um erro ao criar o perfil. Entre em contato com o suporte.');
               }
           }
       } else {
@@ -95,6 +124,21 @@ const LoginPage: React.FC = () => {
                 {isSignUp ? 'Junte-se a comunidade de críticos.' : 'Conecte-se com outros fãs de séries.'}
             </p>
           </div>
+        
+          {/* Alerts */}
+          {error && (
+            <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-start gap-3 animate-in slide-in-from-top-2 fade-in duration-300">
+                <span className="material-symbols-outlined text-red-600 dark:text-red-400 shrink-0">error</span>
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          )}
+          
+          {success && (
+            <div className="mb-6 p-4 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 flex items-start gap-3 animate-in slide-in-from-top-2 fade-in duration-300">
+                <span className="material-symbols-outlined text-green-600 dark:text-green-400 shrink-0">check_circle</span>
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">{success}</p>
+            </div>
+          )}
 
           <form onSubmit={handleAuth} className="space-y-6">
             <div className="space-y-2">
@@ -128,17 +172,43 @@ const LoginPage: React.FC = () => {
                 <input 
                   className="block w-full pl-11 pr-12 py-3.5 bg-white dark:bg-surface-dark border border-gray-200 dark:border-border-dark rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200" 
                   placeholder="Digite sua senha" 
-                  type="password" 
+                  type={showPassword ? "text" : "password"} 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
                 />
-                <button className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 dark:text-text-muted hover:text-gray-600 dark:hover:text-white focus:outline-none transition-colors" type="button">
-                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>visibility_off</span>
+                <button 
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 dark:text-text-muted hover:text-gray-600 dark:hover:text-white focus:outline-none transition-colors" 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                    {showPassword ? 'visibility' : 'visibility_off'}
+                  </span>
                 </button>
               </div>
             </div>
+
+            {isSignUp && (
+              <div className="space-y-2 animate-in slide-in-from-top-2 fade-in duration-300">
+                <label className="block text-sm font-medium text-gray-900 dark:text-white ml-1">Confirmar Senha</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="material-symbols-outlined text-gray-400 dark:text-text-muted group-focus-within:text-primary transition-colors">lock_reset</span>
+                  </div>
+                  <input 
+                    className="block w-full pl-11 pr-4 py-3.5 bg-white dark:bg-surface-dark border border-gray-200 dark:border-border-dark rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200" 
+                    placeholder="Confirme sua senha" 
+                    type="password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required={isSignUp}
+                    minLength={6}
+                  />
+                </div>
+              </div>
+            )}
 
             <button 
               className="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-xl shadow-lg shadow-primary/25 text-base font-bold text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-background-dark transition-all duration-200 transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed" 
@@ -148,32 +218,6 @@ const LoginPage: React.FC = () => {
               {loading ? 'Processando...' : (isSignUp ? 'Criar Conta' : 'Entrar')}
             </button>
           </form>
-
-          <div className="mt-8">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200 dark:border-border-dark"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-background-light dark:bg-background-dark text-gray-500 dark:text-text-muted font-medium">Ou continue com</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <button className="flex items-center justify-center px-4 py-3 border border-gray-200 dark:border-border-dark rounded-xl bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-[#342445] transition-colors duration-200 group" type="button">
-                <img 
-                  alt="Google" 
-                  className="h-5 w-5 mr-2 opacity-90 group-hover:opacity-100 transition-opacity" 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBI9sLVtA_S65sdbvWTEyNdYZHXA_bpukuXHesebomQeiETPtwM_Xk79o5r_nZsvxc6wSFhg3-DPl49-RwaftiNTbINraetOKDVcHTtb0WCWGzTQTTDL3bQz4S5GyP9WpzoqoF-QwGlXHkxlBoi-C9raCR4j8OFNTXCUwTtLfUAQ2DsjENBtZzjrbn4WkDFqdsHLMRcRhyBXE9ijIWosdmkUdohqE5jgN1BnUdsS4zB8iCzrGrBW13a7-gQ39RuoWNMgrczEsTvMUI0"
-                />
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Google</span>
-              </button>
-              <button className="flex items-center justify-center px-4 py-3 border border-gray-200 dark:border-border-dark rounded-xl bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-[#342445] transition-colors duration-200 group" type="button">
-                <span className="material-symbols-outlined text-gray-900 dark:text-white mr-2 opacity-90 group-hover:opacity-100" style={{ fontSize: '22px' }}>ios</span>
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Apple</span>
-              </button>
-            </div>
-          </div>
 
           <p className="mt-10 text-center text-sm text-gray-600 dark:text-text-muted">
             {isSignUp ? 'Já tem uma conta?' : 'Ainda não tem conta?'}
@@ -192,5 +236,3 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
-
-// export default LoginPage; removido duplicado

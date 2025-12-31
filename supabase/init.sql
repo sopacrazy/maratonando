@@ -48,6 +48,8 @@ create table if not exists public.posts (
   image_url text, -- URL da imagem no Storage
   tmdb_id integer, -- Opcional: vinculado a uma série específica
   series_title text, -- Opcional: nome da série vinculada
+  is_spoiler boolean default false, -- Indica se o post contém spoilers
+  spoiler_topic text, -- Tópico/série sobre a qual o spoiler se refere
   likes_count integer default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -60,14 +62,29 @@ create policy "Users can update own posts." on public.posts for update using (au
 create policy "Users can delete own posts." on public.posts for delete using (auth.uid() = user_id);
 
 -- --- STORAGE (Criado via SQL) ---
+
+-- Bucket 'post-images'
 insert into storage.buckets (id, name, public) 
 values ('post-images', 'post-images', true) 
 on conflict (id) do nothing;
 
-create policy "Public Access" 
+create policy "Public Access Post Images" 
   on storage.objects for select 
   using ( bucket_id = 'post-images' );
 
-create policy "Authenticated Uploads" 
+create policy "Authenticated Uploads Post Images" 
   on storage.objects for insert 
   with check ( bucket_id = 'post-images' and auth.role() = 'authenticated' );
+
+-- Bucket 'avatars' (NOVO)
+insert into storage.buckets (id, name, public) 
+values ('avatars', 'avatars', true) 
+on conflict (id) do nothing;
+
+create policy "Public Access Avatars" 
+  on storage.objects for select 
+  using ( bucket_id = 'avatars' );
+
+create policy "Authenticated Uploads Avatars" 
+  on storage.objects for insert 
+  with check ( bucket_id = 'avatars' and auth.role() = 'authenticated' );
