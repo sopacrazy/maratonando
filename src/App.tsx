@@ -8,6 +8,7 @@ import { ErrorProvider } from './context/ErrorContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ChatSystem } from './components/Chat/ChatSystem';
 import OnboardingManager from './components/Onboarding/OnboardingManager';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy loading de páginas para melhor performance
 const LoginPage = lazy(() => import('./pages/Login'));
@@ -151,19 +152,21 @@ export default function App() {
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/" element={<LoginPage />} />
-                  <Route path="/feed" element={<FeedPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
-                  <Route path="/market" element={<MarketplacePage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/search" element={<SeriesSearchPage />} />
-                  <Route path="/@:handle" element={<HandleRedirect />} />
+                  {/* Rotas públicas - apenas perfil público */}
                   <Route path="/user/:userId" element={<PublicProfilePage />} />
-                  <Route path="/series/:id" element={<SeriesDetailsPage />} />
-                  <Route path="/admin" element={<AdminPanel />} />
-                  <Route path="/clubes" element={<ClubesPage />} />
-                  <Route path="/clubes/:id" element={<ClubDetailsPage />} />
-                  <Route path="/clubes/:id/arena" element={<ArenaPage />} />
-                  <Route path="*" element={<Navigate to="/feed" replace />} />
+                  {/* Rotas protegidas - requerem autenticação */}
+                  <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
+                  <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  <Route path="/market" element={<ProtectedRoute><MarketplacePage /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                  <Route path="/search" element={<ProtectedRoute><SeriesSearchPage /></ProtectedRoute>} />
+                  <Route path="/@:handle" element={<ProtectedRoute><HandleRedirect /></ProtectedRoute>} />
+                  <Route path="/series/:id" element={<ProtectedRoute><SeriesDetailsPage /></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+                  <Route path="/clubes" element={<ProtectedRoute><ClubesPage /></ProtectedRoute>} />
+                  <Route path="/clubes/:id" element={<ProtectedRoute><ClubDetailsPage /></ProtectedRoute>} />
+                  <Route path="/clubes/:id/arena" element={<ProtectedRoute><ArenaPage /></ProtectedRoute>} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
               <ChatSystem />

@@ -82,7 +82,12 @@ const PublicProfilePage: React.FC = () => {
 
   useEffect(() => {
     if (!userId) {
-      navigate("/feed");
+      // Se não tiver userId, redirecionar para login se não estiver logado, ou feed se estiver
+      if (!currentUser?.id) {
+        navigate("/");
+      } else {
+        navigate("/feed");
+      }
       return;
     }
 
@@ -102,7 +107,12 @@ const PublicProfilePage: React.FC = () => {
         // 1. Verificar se perfil existe
         if (!profile) {
           alert("Usuário não encontrado");
-          navigate("/feed");
+          // Redirecionar para login se não estiver logado, ou feed se estiver
+          if (!currentUser?.id) {
+            navigate("/");
+          } else {
+            navigate("/feed");
+          }
           return;
         }
         setProfileUser(profile);
