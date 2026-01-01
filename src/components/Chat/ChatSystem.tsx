@@ -24,13 +24,17 @@ export const ChatSystem: React.FC = () => {
 
   if (!currentUser?.id) return null; // Don't show if not logged in
 
+  // Don't show on login page
+  const isLoginPage = window.location.hash === '#/' || window.location.hash === '' || window.location.hash.includes('#/login');
+  if (isLoginPage) return null;
+
   const isSeriesPage = window.location.hash.includes('#/series/'); // Simple hash check
   if (isSeriesPage) return null;
 
   return (
     <>
       {/* Floating Button (when closed or open, maybe just hide when open if it expands from it) */}
-      <div className={`fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2`}>
+      <div className={`fixed bottom-20 sm:bottom-4 right-4 z-50 flex flex-col items-end gap-2`}>
         
         {/* The Chat Box */}
         {isOpen && (
@@ -42,9 +46,9 @@ export const ChatSystem: React.FC = () => {
             
             {!activeConversation ? (
               <>
-                <div className="p-3 bg-purple-600 text-white flex justify-between items-center shrink-0 rounded-t-xl">
+                <div className="p-3 bg-primary text-white flex justify-between items-center shrink-0 rounded-t-xl">
                   <h3 className="font-bold">Mensagens</h3>
-                  <button onClick={toggleChat} className="hover:bg-purple-700 p-1 rounded">
+                  <button onClick={toggleChat} className="hover:bg-primary/90 p-1 rounded">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -71,7 +75,7 @@ export const ChatSystem: React.FC = () => {
         {!isOpen && (
           <button
             onClick={toggleChat}
-            className="w-14 h-14 bg-purple-600 rounded-full shadow-lg flex items-center justify-center text-white hover:bg-purple-700 transition transform hover:scale-105 relative"
+            className="w-14 h-14 bg-primary rounded-full shadow-lg flex items-center justify-center text-white hover:bg-primary/90 transition transform hover:scale-105 relative"
           >
             {/* Icon */}
             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">

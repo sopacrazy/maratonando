@@ -20,6 +20,7 @@ const MarketplacePage: React.FC = () => {
   const [confirmingStamp, setConfirmingStamp] = useState<Stamp | null>(null);
   const [purchasedStamp, setPurchasedStamp] = useState<Stamp | null>(null);
   const [activeTab, setActiveTab] = useState<'stamps' | 'themes'>('stamps');
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   // Mock Themes Data
   const THEMES = [
@@ -42,9 +43,12 @@ const MarketplacePage: React.FC = () => {
   ];
 
   useEffect(() => {
-    loadStamps();
+    if (!hasLoaded) {
+      loadStamps();
+      setHasLoaded(true);
+    }
     if (user?.id) loadUserOwnership();
-  }, [user]);
+  }, [user, hasLoaded]);
 
   const loadUserOwnership = async () => {
       if (!user?.id) return;
@@ -159,7 +163,7 @@ const MarketplacePage: React.FC = () => {
                 Colecione os clássicos de <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-300">Pixel Art</span>
               </h1>
               <p className="text-gray-300 text-lg leading-relaxed max-w-md">
-                Novos selos exclusivos da temporada final de Stranger Things já disponíveis. Complete sua coleção antes que acabem!
+                Novos selos exclusivos já disponíveis. Complete sua coleção antes que acabem!
               </p>
               <div className="flex gap-4 pt-4">
                 <button className="flex h-12 px-6 items-center justify-center rounded-lg bg-primary hover:bg-primary/90 text-white text-base font-bold transition-transform active:scale-95 shadow-lg shadow-primary/25">
@@ -171,47 +175,10 @@ const MarketplacePage: React.FC = () => {
               </div>
             </div>
             <div className="flex-1 w-full flex justify-center md:justify-end relative min-h-[250px] md:min-h-auto">
-              {stamps.length > 0 ? (
-                  <div className="relative w-full max-w-[400px] h-[250px] flex items-center justify-center">
-                    {/* Background Glow */}
-                    <div className="absolute inset-0 bg-primary/30 blur-[50px] rounded-full scale-75 animate-pulse"></div>
-                    
-                    {/* Mock 3 Stamps Stack */}
-                    {stamps.slice(0, 3).map((stamp, index) => {
-                        const offsets = [
-                            { x: '-translate-x-10 md:-translate-x-16', r: '-rotate-6', z: 'z-10' }, // Left
-                            { x: 'translate-x-0', r: 'rotate-0', z: 'z-30 scale-105' },             // Center
-                            { x: 'translate-x-10 md:translate-x-16', r: 'rotate-6', z: 'z-20' }   // Right
-                        ];
-                        const style = offsets[index] || offsets[1];
-
-                        return (
-                            <div 
-                                key={stamp.id}
-                                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 md:w-44 md:h-44 bg-white dark:bg-card-dark rounded-xl shadow-xl border-2 border-white dark:border-white/10 flex items-center justify-center transition-all duration-500 hover:scale-110 hover:z-50 hover:rotate-0 ${style.x} ${style.r} ${style.z}`}
-                            >
-                                <div className="absolute inset-1.5 rounded-lg overflow-hidden bg-gray-100 dark:bg-background-dark flex items-center justify-center">
-                                    {stamp.image_url && (
-                                        <img src={stamp.image_url} alt={stamp.name} className="w-full h-full object-cover" />
-                                    )}
-                                </div>
-                                {/* Label */}
-                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md text-white text-[9px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap border border-white/20">
-                                    {stamp.name}
-                                </div>
-                            </div>
-                        );
-                    })}
-                  </div>
-              ) : (
-                 // Fallback Skeleton/Placeholder
-                 <div className="relative w-full max-w-md aspect-video bg-white/5 rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center">
-                     <div className="text-center">
-                        <span className="material-symbols-outlined text-6xl text-white/20 mb-2">style</span>
-                        <p className="text-white/30 text-sm font-medium">Carregando coleção...</p>
-                     </div>
-                 </div>
-              )}
+              <div className="relative w-full max-w-[400px] h-[250px] flex items-center justify-center">
+                {/* Background Glow */}
+                <div className="absolute inset-0 bg-primary/30 blur-[50px] rounded-full scale-75 animate-pulse"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -260,45 +227,6 @@ const MarketplacePage: React.FC = () => {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-slate-900 dark:text-white font-bold text-sm uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-lg">category</span>
-                    Séries
-                  </h3>
-                  
-                  {/* Search Input */}
-                  <div className="relative mb-3">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-sm">search</span>
-                    <input 
-                      type="text" 
-                      placeholder="Buscar série..." 
-                      className="w-full bg-gray-50 dark:bg-card-dark border border-gray-200 dark:border-white/10 rounded-lg py-1.5 pl-8 pr-3 text-xs text-slate-900 dark:text-white focus:ring-1 focus:ring-primary outline-none transition-colors placeholder:text-gray-400"
-                      value={seriesSearch}
-                      onChange={(e) => setSeriesSearch(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
-                    {allUniqueSeries.map(series => (
-                      <label key={series} className="flex items-center gap-3 cursor-pointer group">
-                        <input 
-                          type="checkbox" 
-                          className="form-checkbox rounded text-primary bg-gray-100 dark:bg-card-dark border-gray-300 dark:border-white/10 focus:ring-primary focus:ring-offset-background-light dark:focus:ring-offset-background-dark"
-                          checked={selectedSeries.includes(series)}
-                          onChange={(e) => {
-                             if(e.target.checked) setSelectedSeries([...selectedSeries, series]);
-                             else setSelectedSeries(selectedSeries.filter(s => s !== series));
-                          }}
-                        />
-                        <span className="text-slate-600 dark:text-gray-300 group-hover:text-primary transition-colors text-sm truncate">{series}</span>
-                      </label>
-                    ))}
-                    {allUniqueSeries.length === 0 && (
-                      <p className="text-xs text-slate-400 dark:text-gray-500 italic text-center py-2">Nao há séries disponiveis.</p>
-                    )}
-                  </div>
-                </div>
-                <div className="h-px w-full bg-gray-100 dark:bg-white/5"></div>
-                <div>
-                  <h3 className="text-slate-900 dark:text-white font-bold text-sm uppercase tracking-wider mb-3 flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-lg">diamond</span>
                     Raridade
                   </h3>
@@ -344,81 +272,19 @@ const MarketplacePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Stamps Grid */}
-            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {loading ? (
-                  <div className="col-span-full py-20 text-center">
-                      <span className="material-symbols-outlined text-4xl animate-spin text-primary">progress_activity</span>
-                      <p className="text-slate-500 mt-2">Carregando loja...</p>
-                  </div>
-              ) : filteredStamps.length > 0 ? (
-                filteredStamps.map(stamp => {
-                    const color = getRarityColor(stamp.rarity);
-                    const borderClass = `border-${color}-500/30 hover:border-${color}-500/60`;
-                    const shadowClass = `hover:shadow-${color}-500/20`;
-
-                    return (
-                    <div key={stamp.id} className={`group relative bg-white dark:bg-card-dark rounded-xl p-3 border border-gray-200 dark:${borderClass} dark:border-transparent transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-lg dark:${shadowClass} flex flex-col gap-3`}>
-                        
-                        {/* Badge de Raridade */}
-                        <div className="absolute top-3 right-3 z-10">
-                        <div className={`bg-${color}-500/10 dark:bg-${color}-500/20 backdrop-blur-sm border border-${color}-500/30 dark:border-${color}-500/50 text-${color}-600 dark:text-${color}-400 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded`}>
-                            {stamp.rarity}
-                        </div>
-                        </div>
-                        
-                        {/* Imagem do Selo */}
-                        <div className="aspect-square w-full rounded-lg bg-gray-100 dark:bg-background-dark flex items-center justify-center relative overflow-hidden group-hover:bg-gray-200 dark:group-hover:bg-black transition-colors">
-                        <div className={`absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-${color}-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-                            {stamp.image_url ? (
-                                <img src={stamp.image_url} alt={stamp.name} className="w-3/4 h-3/4 object-contain drop-shadow-lg transition-transform duration-300 group-hover:scale-110" />
-                            ) : (
-                                <span className="material-symbols-outlined text-4xl text-gray-400">military_tech</span>
-                            )}
-                        </div>
-
-                        {/* Informações */}
-                        <div className="flex flex-col gap-1">
-                        <p className="text-slate-500 dark:text-text-secondary text-xs font-medium truncate">{stamp.series_title || 'Coleção Diversa'}</p>
-                        <h3 className="text-slate-900 dark:text-white font-bold text-base leading-tight truncate">{stamp.name}</h3>
-                        </div>
-
-                        {/* Preço e Botão */}
-                        <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-                        <span className="text-slate-900 dark:text-white font-black text-lg">{stamp.price?.toLocaleString()} 🪙</span>
-                        <button 
-                            onClick={() => handleBuy(stamp)}
-                            disabled={ownedStampIds.includes(stamp.id) || purchasingId === stamp.id}
-                            className={`size-8 rounded-lg ${
-                                ownedStampIds.includes(stamp.id)
-                                ? 'bg-green-500 text-white cursor-default'
-                                : stamp.rarity === 'Lendário' 
-                                ? 'bg-yellow-500 text-black hover:bg-yellow-400' 
-                                : 'bg-slate-100 dark:bg-card-dark text-slate-700 dark:text-white hover:bg-primary hover:text-white dark:hover:bg-primary border border-gray-200 dark:border-white/10 hover:border-transparent'
-                            } flex items-center justify-center transition-colors shadow-sm`}
-                            title={ownedStampIds.includes(stamp.id) ? "Adquirido" : "Comprar Agora"}
-                        >
-                             {purchasingId === stamp.id ? (
-                                <span className="material-symbols-outlined text-lg animate-spin">refresh</span>
-                             ) : ownedStampIds.includes(stamp.id) ? (
-                                <span className="material-symbols-outlined text-lg">check</span>
-                             ) : stamp.rarity === 'Lendário' ? (
-                                <span className="material-symbols-outlined text-lg font-bold">shopping_cart</span>
-                             ) : (
-                                <span className="material-symbols-outlined text-lg">add</span>
-                             )}
-                        </button>
-                        </div>
-                    </div>
-                    );
-                })
-              ) : (
-                 <div className="col-span-full py-16 flex flex-col items-center justify-center text-center opacity-60">
-                     <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">store_off</span>
-                     <h3 className="text-xl font-bold text-slate-900 dark:text-white">Loja Vazia</h3>
-                     <p className="text-slate-500 max-w-sm mx-auto mt-2">Nenhum selo disponível para compra no momento. Volte mais tarde!</p>
-                 </div>
-              )}
+            {/* Stamps Grid - Em Breve */}
+            <div className="bg-white dark:bg-card-dark rounded-xl border border-gray-200 dark:border-white/5 p-12 sm:p-16 text-center">
+              <div className="flex flex-col items-center justify-center gap-4">
+                <span className="material-symbols-outlined text-6xl sm:text-7xl text-primary mb-2">
+                  military_tech
+                </span>
+                <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-2">
+                  Em Breve
+                </h3>
+                <p className="text-slate-600 dark:text-text-secondary text-base sm:text-lg max-w-md">
+                  Estamos preparando uma coleção incrível de selos e badges para você! Em breve você poderá colecionar e trocar seus selos favoritos.
+                </p>
+              </div>
             </div>
 
             {/* Pagination */}
@@ -453,8 +319,7 @@ const MarketplacePage: React.FC = () => {
                             </div>
                             <div className="p-4">
                                 <p className="text-slate-600 dark:text-gray-400 text-sm mb-4 leading-relaxed">{theme.description}</p>
-                                <div className="flex items-center justify-between mt-auto">
-                                    <span className="text-lg font-black text-slate-900 dark:text-white">{theme.price} 🪙</span>
+                                <div className="flex items-center justify-end mt-auto">
                                     <button 
                                         disabled
                                         className="bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400 font-bold py-2 px-4 rounded-lg cursor-not-allowed text-sm"

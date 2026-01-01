@@ -442,6 +442,47 @@ const Navigation: React.FC<NavigationProps> = ({ page }) => {
 
           <div className="my-2 border-t border-gray-100 dark:border-white/5 mx-2"></div>
 
+          {/* Busca de Usuários no Mobile */}
+          <div className="px-3 mb-2">
+            <div className="relative" ref={searchRef}>
+              <div className="flex items-center gap-2 rounded-lg bg-gray-100 dark:bg-[#362348] px-3 py-2.5 border border-gray-200 dark:border-white/10">
+                <span className="material-symbols-outlined text-lg text-gray-400 dark:text-[#ad92c9] shrink-0">search</span>
+                <input
+                  type="text"
+                  placeholder="Buscar usuários..."
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  className="flex-1 bg-transparent border-none outline-none text-slate-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#ad92c9] text-sm min-w-0"
+                />
+                {isSearching && (
+                  <span className="material-symbols-outlined text-lg text-primary animate-spin shrink-0">progress_activity</span>
+                )}
+              </div>
+              
+              {/* Resultados da busca no mobile */}
+              {searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-surface-dark rounded-lg shadow-xl border border-gray-200 dark:border-white/10 overflow-hidden z-[100] max-h-[250px] overflow-y-auto">
+                  {searchResults.map((result: any) => (
+                    <div
+                      key={result.id}
+                      onClick={() => {
+                        goToProfile(result.id);
+                        setIsSidebarOpen(false);
+                      }}
+                      className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer border-b border-gray-100 dark:border-white/5 last:border-0 active:bg-gray-100 dark:active:bg-white/10"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-cover bg-center shrink-0" style={{ backgroundImage: `url('${result.avatar}')` }}></div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">{result.name}</h4>
+                        <span className="text-xs text-slate-500 dark:text-text-secondary truncate block">{result.handle}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Actions */}
           <button
             onClick={() => {
@@ -459,7 +500,7 @@ const Navigation: React.FC<NavigationProps> = ({ page }) => {
             onClick={() => setIsSidebarOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
           >
-            <span className="material-symbols-outlined text-2xl">search</span>
+            <span className="material-symbols-outlined text-2xl">tv</span>
             <span>Buscar Série</span>
           </Link>
 

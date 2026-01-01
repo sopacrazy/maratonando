@@ -6,7 +6,7 @@ create table if not exists public.profiles (
   handle text unique,
   avatar text default 'https://placeholder.pics/svg/150',
   bio text,
-  coins integer default 2450,
+  coins integer default 0,
   profile_theme text default 'default',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -14,7 +14,11 @@ create table if not exists public.profiles (
 -- Habilitar segurança para Profiles
 alter table public.profiles enable row level security;
 
--- Políticas de Profiles
+-- Políticas de Profiles (com DROP IF EXISTS para evitar erros de duplicação)
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert their own profile." ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile." ON public.profiles;
+
 create policy "Public profiles are viewable by everyone." on public.profiles for select using (true);
 create policy "Users can insert their own profile." on public.profiles for insert with check (auth.uid() = id);
 create policy "Users can update own profile." on public.profiles for update using (auth.uid() = id);
@@ -37,6 +41,10 @@ create table if not exists public.user_series (
 
 -- RLS para user_series
 alter table public.user_series enable row level security;
+
+DROP POLICY IF EXISTS "Qualquer um pode ver séries dos usuarios." ON public.user_series;
+DROP POLICY IF EXISTS "Usuario gerencia suas proprias series." ON public.user_series;
+
 create policy "Qualquer um pode ver séries dos usuarios." on public.user_series for select using (true);
 create policy "Usuario gerencia suas proprias series." on public.user_series for all using (auth.uid() = user_id);
 
@@ -56,6 +64,12 @@ create table if not exists public.posts (
 
 -- RLS para posts
 alter table public.posts enable row level security;
+
+DROP POLICY IF EXISTS "Public posts are viewable by everyone." ON public.posts;
+DROP POLICY IF EXISTS "Users can create posts." ON public.posts;
+DROP POLICY IF EXISTS "Users can update own posts." ON public.posts;
+DROP POLICY IF EXISTS "Users can delete own posts." ON public.posts;
+
 create policy "Public posts are viewable by everyone." on public.posts for select using (true);
 create policy "Users can create posts." on public.posts for insert with check (auth.uid() = user_id);
 create policy "Users can update own posts." on public.posts for update using (auth.uid() = user_id);
@@ -67,6 +81,9 @@ create policy "Users can delete own posts." on public.posts for delete using (au
 insert into storage.buckets (id, name, public) 
 values ('post-images', 'post-images', true) 
 on conflict (id) do nothing;
+
+DROP POLICY IF EXISTS "Public Access Post Images" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Uploads Post Images" ON storage.objects;
 
 create policy "Public Access Post Images" 
   on storage.objects for select 
@@ -80,6 +97,9 @@ create policy "Authenticated Uploads Post Images"
 insert into storage.buckets (id, name, public) 
 values ('avatars', 'avatars', true) 
 on conflict (id) do nothing;
+
+DROP POLICY IF EXISTS "Public Access Avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Uploads Avatars" ON storage.objects;
 
 create policy "Public Access Avatars" 
   on storage.objects for select 

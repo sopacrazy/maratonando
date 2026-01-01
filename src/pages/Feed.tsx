@@ -19,6 +19,12 @@ import WelcomeStampModal from "../components/WelcomeStampModal";
 import { Stamp } from "../types";
 import { useError } from "../context/ErrorContext";
 import LazyImage from "../components/LazyImage";
+import OpinionBattleCard, {
+  OpinionBattle,
+} from "../components/OpinionBattleCard";
+import CreateBattleModal from "../components/CreateBattleModal";
+import BattleTutorialModal from "../components/BattleTutorialModal";
+import { BattleService } from "../services/battleService";
 
 // Dados mockados removidos
 const INITIAL_POSTS: Post[] = [];
@@ -81,7 +87,9 @@ const FeedPage: React.FC = () => {
   const { showError } = useError();
   const [posts, setPosts] = useState<Post[]>([]);
   const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]); // Should be User[] but being loose for now
-  const [feedType, setFeedType] = useState<"following" | "global">("following"); // Feed padrão: apenas quem você segue
+  const [feedType, setFeedType] = useState<"following" | "global" | "battles">(
+    "following"
+  ); // Feed padrão: apenas quem você segue
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [trendingSeries, setTrendingSeries] = useState<TMDBSeries[]>([]);
@@ -130,6 +138,10 @@ const FeedPage: React.FC = () => {
   const [welcomeStamp, setWelcomeStamp] = useState<any | null>(null); // For welcome onboarding modal
   const [isSpoiler, setIsSpoiler] = useState(false); // Estado para spoiler antes de publicar
   const [spoilerTopic, setSpoilerTopic] = useState(""); // Tópico do spoiler (opcional)
+  const [opinionBattles, setOpinionBattles] = useState<OpinionBattle[]>([]); // Batalhas de opinião
+  const [loadingBattles, setLoadingBattles] = useState(false); // Estado de loading para batalhas
+  const [isCreateBattleModalOpen, setIsCreateBattleModalOpen] = useState(false);
+  const [isBattleTutorialOpen, setIsBattleTutorialOpen] = useState(false);
 
   useEffect(() => {
     if (location.state?.welcomeStamp) {
@@ -359,10 +371,100 @@ const FeedPage: React.FC = () => {
       // Carregar séries do usuário para saber quais já foram adicionadas
       loadMySeries();
       loadSuggestions();
+      loadOpinionBattles(); // Carregar batalhas de opinião (async)
     }
     loadTrending();
     loadSuggestedClubs();
   }, [user?.id, feedType]); // Reagir a mudanças no tipo de feed
+
+  // Carregar batalhas do banco de dados
+  const loadOpinionBattles = async () => {
+    if (!user?.id) {
+      setOpinionBattles([]);
+      setLoadingBattles(false);
+      return;
+    }
+
+    setLoadingBattles(true);
+    try {
+      // Se estiver na aba "Batalhas", carregar todas (global)
+      // Caso contrário, usar o feedType atual
+      const battleFeedType = feedType === "battles" ? "global" : feedType;
+      const battles = await BattleService.getBattles(
+        user.id,
+        battleFeedType,
+        20,
+        0
+      );
+
+      // Converter formato do banco para formato do componente
+      const formattedBattles: OpinionBattle[] = battles.map((battle: any) => ({
+        id: battle.id,
+        creator: {
+          id: battle.creator.id,
+          name: battle.creator.name,
+          avatar: battle.creator.avatar,
+          handle: battle.creator.handle,
+        },
+        topic: battle.topic,
+        description: battle.description,
+        seriesTitle: battle.series_title,
+        seriesImage: battle.series_image,
+        endsAt: battle.ends_at,
+        status: battle.status,
+        winner: battle.winner_side, // 'agree' | 'disagree' | null
+        winnerComment: battle.winner_comment_id
+          ? {
+              id: battle.winner_comment_id,
+              user: { id: "", name: "", avatar: "", handle: "" },
+              content: "",
+              likes: 0,
+              createdAt: "",
+            }
+          : undefined,
+        agreeComments:
+          battle.agreeComments?.map((c: any) => ({
+            id: c.id,
+            user: {
+              id: c.user.id,
+              name: c.user.name,
+              avatar: c.user.avatar,
+              handle: c.user.handle,
+            },
+            content: c.content,
+            likes: c.likes_count,
+            createdAt: c.created_at,
+            userHasLiked: c.userHasLiked || false,
+          })) || [],
+        disagreeComments:
+          battle.disagreeComments?.map((c: any) => ({
+            id: c.id,
+            user: {
+              id: c.user.id,
+              name: c.user.name,
+              avatar: c.user.avatar,
+              handle: c.user.handle,
+            },
+            content: c.content,
+            likes: c.likes_count,
+            createdAt: c.created_at,
+            userHasLiked: c.userHasLiked || false,
+          })) || [],
+        isPublic: battle.is_public,
+      }));
+
+      setOpinionBattles(formattedBattles);
+    } catch (error: any) {
+      console.error("Erro ao carregar batalhas:", error);
+      showError(
+        error?.message || "Erro ao carregar batalhas de opiniões.",
+        "error"
+      );
+      setOpinionBattles([]);
+    } finally {
+      setLoadingBattles(false);
+    }
+  };
 
   const loadSuggestions = async () => {
     if (!user?.id) return;
@@ -474,18 +576,17 @@ const FeedPage: React.FC = () => {
       // Carregar clubes mesmo sem userId para mostrar todos
       const userId = user?.id;
       const clubs = await ClubService.getClubs(undefined, userId);
-      console.log('[Feed] Clubes carregados:', clubs);
-      
+
       // Mostrar todos os clubes (limitado a 5) - pode incluir clubes que o usuário já é membro
       // Priorizar clubes que o usuário não é membro, mas se não houver, mostrar todos
-      const clubsNotMember = clubs.filter(club => !club.is_member);
-      const clubsToShow = clubsNotMember.length > 0 
-        ? clubsNotMember.slice(0, 5)
-        : clubs.slice(0, 5);
-      console.log('[Feed] Clubes sugeridos (mostrando):', clubsToShow);
+      const clubsNotMember = clubs.filter((club) => !club.is_member);
+      const clubsToShow =
+        clubsNotMember.length > 0
+          ? clubsNotMember.slice(0, 5)
+          : clubs.slice(0, 5);
       setSuggestedClubs(clubsToShow);
     } catch (error: any) {
-      console.error('[Feed] Erro ao carregar clubes sugeridos:', error);
+      console.error("[Feed] Erro ao carregar clubes sugeridos:", error);
       // Não mostrar erro ao usuário, apenas logar
       setSuggestedClubs([]);
     }
@@ -721,11 +822,11 @@ const FeedPage: React.FC = () => {
           {/* Main Feed Column */}
           <div className="lg:col-span-8 flex flex-col gap-4 sm:gap-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <h1 className="text-slate-900 dark:text-white text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
                   Feed de Séries
                 </h1>
-                {/* Tabs pequenas para alternar entre Seguindo e Global */}
+                {/* Tabs pequenas para alternar entre Seguindo, Global e Batalhas */}
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => {
@@ -757,16 +858,32 @@ const FeedPage: React.FC = () => {
                   >
                     Global
                   </button>
+                  <button
+                    onClick={() => {
+                      setFeedType("battles");
+                      loadOpinionBattles();
+                    }}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors touch-manipulation ${
+                      feedType === "battles"
+                        ? "text-primary font-bold bg-primary/10 dark:bg-primary/20"
+                        : "text-slate-500 dark:text-text-secondary hover:text-slate-700 dark:hover:text-white"
+                    }`}
+                  >
+                    Batalhas
+                  </button>
                 </div>
               </div>
-              <button
-                className="md:hidden text-primary p-2 -mr-2 self-end"
-                aria-label="Buscar"
-              >
-                <span className="material-symbols-outlined text-2xl">
-                  search
-                </span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsBattleTutorialOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold text-sm rounded-lg transition-colors shadow-md hover:shadow-lg"
+                >
+                  <span className="material-symbols-outlined text-lg">
+                    swords
+                  </span>
+                  <span>Criar Batalha</span>
+                </button>
+              </div>
             </div>
 
             {/* Composer - Mobile Optimized */}
@@ -1016,432 +1133,514 @@ const FeedPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Posts - Mobile Optimized */}
-            {loadingPosts && posts.length === 0 ? (
-              <div className="bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-surface-border p-6 sm:p-8 text-center">
-                <p className="text-slate-600 dark:text-text-secondary text-sm sm:text-base">
-                  Carregando posts...
-                </p>
-              </div>
-            ) : posts.length === 0 ? (
-              <div className="bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-surface-border p-6 sm:p-8 text-center">
-                {feedType === "following" ? (
-                  <>
+            {/* Conteúdo baseado na aba selecionada */}
+            {feedType === "battles" ? (
+              /* Aba Batalhas - Mostrar apenas batalhas */
+              <>
+                {loadingBattles ? (
+                  <div className="bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-surface-border p-6 sm:p-8 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="material-symbols-outlined text-5xl sm:text-6xl text-primary animate-spin mb-3 sm:mb-4">
+                        progress_activity
+                      </span>
+                      <p className="text-slate-600 dark:text-text-secondary text-sm sm:text-base">
+                        Carregando batalhas...
+                      </p>
+                    </div>
+                  </div>
+                ) : opinionBattles.length === 0 ? (
+                  <div className="bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-surface-border p-6 sm:p-8 text-center">
                     <span className="material-symbols-outlined text-5xl sm:text-6xl text-slate-400 dark:text-text-secondary mb-3 sm:mb-4">
-                      person_add
+                      swords
                     </span>
                     <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2">
-                      Você ainda não está seguindo ninguém
+                      Nenhuma batalha ainda
                     </h3>
                     <p className="text-sm sm:text-base text-slate-600 dark:text-text-secondary mb-4 px-2">
-                      Comece a seguir pessoas para ver suas publicações aqui!
+                      Seja o primeiro a criar uma batalha de opiniões!
                     </p>
                     <button
-                      onClick={() => navigate("/search")}
+                      onClick={() => setIsBattleTutorialOpen(true)}
                       className="px-5 py-2.5 bg-primary active:bg-primary/90 text-white text-sm font-bold rounded-lg transition-colors touch-manipulation min-h-[44px]"
                     >
-                      Buscar Usuários
+                      Criar Batalha
                     </button>
-                  </>
+                  </div>
+                ) : (
+                  opinionBattles.map((battle) => (
+                    <OpinionBattleCard
+                      key={battle.id}
+                      battle={battle}
+                      onDefend={(battleId) => {
+                        console.log("Defender batalha:", battleId);
+                      }}
+                      onAttack={(battleId) => {
+                        console.log("Atacar batalha:", battleId);
+                      }}
+                      onCommentAdded={() => {
+                        // Recarregar batalhas após adicionar comentário
+                        loadOpinionBattles();
+                      }}
+                    />
+                  ))
+                )}
+              </>
+            ) : (
+              /* Aba Seguindo/Global - Mostrar posts e batalhas */
+              <>
+                {/* Posts - Mobile Optimized */}
+                {loadingPosts && posts.length === 0 ? (
+                  <div className="bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-surface-border p-6 sm:p-8 text-center">
+                    <p className="text-slate-600 dark:text-text-secondary text-sm sm:text-base">
+                      Carregando posts...
+                    </p>
+                  </div>
+                ) : posts.length === 0 ? (
+                  <div className="bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-surface-border p-6 sm:p-8 text-center">
+                    {feedType === "following" ? (
+                      <>
+                        <span className="material-symbols-outlined text-5xl sm:text-6xl text-slate-400 dark:text-text-secondary mb-3 sm:mb-4">
+                          person_add
+                        </span>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2">
+                          Você ainda não está seguindo ninguém
+                        </h3>
+                        <p className="text-sm sm:text-base text-slate-600 dark:text-text-secondary px-2">
+                          Comece a seguir pessoas para ver suas publicações
+                          aqui!
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-5xl sm:text-6xl text-slate-400 dark:text-text-secondary mb-3 sm:mb-4">
+                          feed
+                        </span>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2">
+                          Nenhuma publicação ainda
+                        </h3>
+                        <p className="text-sm sm:text-base text-slate-600 dark:text-text-secondary px-2">
+                          Seja o primeiro a compartilhar algo!
+                        </p>
+                      </>
+                    )}
+                  </div>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-5xl sm:text-6xl text-slate-400 dark:text-text-secondary mb-3 sm:mb-4">
-                      feed
-                    </span>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2">
-                      Nenhuma publicação ainda
-                    </h3>
-                    <p className="text-sm sm:text-base text-slate-600 dark:text-text-secondary px-2">
-                      Seja o primeiro a compartilhar algo!
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : (
-              posts.map((post) => (
-                <article
-                  key={post.id}
-                  className="bg-white dark:bg-surface-dark rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-gray-200 dark:border-surface-border/50 hover:border-primary/30 dark:hover:border-surface-border transition-colors p-4 sm:p-5"
-                >
-                  {/* Header - Mobile Optimized */}
-                  <div className="flex items-start justify-between mb-3 gap-2">
-                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                      <Link
-                        to={`/user/${post.user.id || post.user_id || ""}`}
-                        className="shrink-0 touch-manipulation"
-                      >
-                        <div
-                          className="size-9 sm:size-10 rounded-full bg-cover bg-center"
-                          style={{
-                            backgroundImage: `url('${post.user.avatar}')`,
-                          }}
-                        ></div>
-                      </Link>
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                          <Link
-                            to={`/user/${post.user.id || post.user_id || ""}`}
-                            className="text-slate-900 dark:text-white font-bold text-sm hover:underline active:opacity-70 cursor-pointer truncate touch-manipulation min-h-[44px] flex items-center"
-                          >
-                            {post.user.name}
-                          </Link>
-                          {post.tag?.type === "watching" && (
-                            <>
-                              <span className="text-slate-500 dark:text-text-secondary text-xs sm:text-sm hidden min-[375px]:inline">
-                                Mencionou a serie
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSeriesClick(post.tag!.text);
-                                }}
-                                className="text-primary font-bold text-xs sm:text-sm hover:underline cursor-pointer truncate max-w-[120px] sm:max-w-none"
-                              >
-                                {post.tag.text}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                        <span className="text-slate-500 dark:text-text-secondary text-[10px] sm:text-xs truncate">
-                          {post.user.handle} • {post.timeAgo}
-                        </span>
-                      </div>
-                    </div>
-                    {post.isSpoiler && (
-                      <span className="bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 px-2 py-0.5 rounded text-xs font-bold uppercase flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">
-                          warning
-                        </span>{" "}
-                        Spoiler
-                      </span>
-                    )}
-                    <div className="relative shrink-0">
-                      {user?.id === post.user_id && (
-                        <>
-                          <button
-                            onClick={() =>
-                              setActiveMenuId(
-                                activeMenuId === post.id ? null : post.id
-                              )
-                            }
-                            className="text-slate-500 dark:text-text-secondary active:text-slate-900 dark:active:text-white p-2 -mr-2 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-                            aria-label="Mais opções"
-                          >
-                            <span className="material-symbols-outlined text-xl">
-                              more_horiz
-                            </span>
-                          </button>
-                          {activeMenuId === post.id && (
-                            <div className="absolute right-0 top-10 sm:top-8 bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border rounded-lg shadow-xl z-20 min-w-[140px] overflow-hidden">
-                              <button
-                                onClick={() => handleDeletePost(post.id)}
-                                className="w-full text-left px-4 py-3 text-sm text-red-600 active:bg-red-50 dark:active:bg-red-900/20 flex items-center gap-2 touch-manipulation min-h-[44px]"
-                              >
-                                <span className="material-symbols-outlined text-lg">
-                                  delete
-                                </span>{" "}
-                                Excluir
-                              </button>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  {post.isSpoiler && !spoilerRevealed[post.id] ? (
-                    <div
-                      onClick={() => toggleSpoiler(post.id)}
-                      className="relative bg-gray-50 dark:bg-black/20 rounded-lg p-3 sm:p-4 text-center border border-dashed border-gray-300 dark:border-surface-border cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group mb-4 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-slate-500 dark:text-text-secondary text-xl sm:text-2xl group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
-                          visibility_off
-                        </span>
-                        <p className="text-sm text-slate-600 dark:text-text-secondary font-medium group-hover:text-slate-900 dark:group-hover:text-white">
-                          Contém spoilers de{" "}
-                          <strong className="text-slate-900 dark:text-white">
-                            {post.spoilerTopic || "uma série"}
-                          </strong>
-                        </p>
-                      </div>
-                      <button className="text-primary text-xs sm:text-sm font-bold hover:underline bg-primary/10 px-3 py-1 rounded-full">
-                        Toque para revelar
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {post.tag?.type === "review" && (
-                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 leading-tight">
-                          {post.tag.text}
-                        </h3>
-                      )}
-
-                      <PostContent
-                        content={post.content}
-                        onSeriesClick={handleSeriesClick}
-                        onUserClick={handleUserClick}
+                    {/* Opinion Battles - Mostrar primeiro para dar destaque */}
+                    {opinionBattles.map((battle) => (
+                      <OpinionBattleCard
+                        key={battle.id}
+                        battle={battle}
+                        onDefend={(battleId) => {
+                          console.log("Defender batalha:", battleId);
+                        }}
+                        onAttack={(battleId) => {
+                          console.log("Atacar batalha:", battleId);
+                        }}
+                        onCommentAdded={() => {
+                          // Recarregar batalhas após adicionar comentário
+                          loadOpinionBattles();
+                        }}
                       />
+                    ))}
 
-                      {post.image && (
-                        <div className="relative w-full rounded-lg overflow-hidden mb-4 group border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-black">
-                          <LazyImage
-                            src={post.image}
-                            alt="Post content"
-                            className="w-full h-auto max-h-[600px] object-contain mx-auto"
-                          />
-                          {post.tag?.type === "review" && (
-                            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1 z-10">
-                              <span className="material-symbols-outlined text-[14px] text-primary">
-                                star
-                              </span>{" "}
-                              Review
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-white/5 mt-2">
-                    <div className="flex gap-3 sm:gap-4">
-                      <button
-                        onClick={() => handleLike(post)}
-                        className={`flex items-center gap-1.5 transition-colors touch-manipulation min-h-[44px] px-2 -ml-2 ${
-                          post.userHasLiked
-                            ? "text-red-500"
-                            : "text-slate-500 dark:text-text-secondary active:text-red-500"
-                        }`}
-                        aria-label={`${
-                          post.userHasLiked ? "Descurtir" : "Curtir"
-                        } post`}
+                    {/* Regular Posts */}
+                    {posts.map((post) => (
+                      <article
+                        key={post.id}
+                        className="bg-white dark:bg-surface-dark rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-gray-200 dark:border-surface-border/50 hover:border-primary/30 dark:hover:border-surface-border transition-colors p-4 sm:p-5"
                       >
-                        <span
-                          className={`material-symbols-outlined text-lg sm:text-[20px] ${
-                            post.userHasLiked ? "filled" : ""
-                          }`}
-                        >
-                          favorite
-                        </span>
-                        <span className="text-xs font-bold">{post.likes}</span>
-                      </button>
-                      <button
-                        onClick={() => toggleComments(post.id)}
-                        className="flex items-center gap-1.5 text-slate-500 dark:text-text-secondary active:text-slate-900 dark:active:text-white transition-colors touch-manipulation min-h-[44px] px-2"
-                        aria-label="Comentar"
-                      >
-                        <span className="material-symbols-outlined text-lg sm:text-[20px]">
-                          chat_bubble
-                        </span>
-                        <span className="text-xs font-bold">
-                          {post.comments}
-                        </span>
-                      </button>
-                      <button
-                        className="flex items-center gap-1.5 text-slate-500 dark:text-text-secondary active:text-slate-900 dark:active:text-white transition-colors touch-manipulation min-h-[44px] px-2"
-                        aria-label="Compartilhar"
-                      >
-                        <span className="material-symbols-outlined text-lg sm:text-[20px]">
-                          share
-                        </span>
-                        <span className="text-xs font-bold">{post.shares}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Comments Section - Mobile Optimized */}
-                  {activeCommentsPostId === post.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 p-4 sm:p-5">
-                      <div className="flex gap-2 mb-4">
-                        <div className="relative flex-1">
-                          <input
-                            className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-3 py-2.5 sm:py-2 text-sm min-h-[44px]"
-                            placeholder="Escreva um comentário..."
-                            value={newCommentText}
-                            onChange={handleCommentInputChange}
-                            onKeyDown={(e) => {
-                              if (showMentionList) {
-                                // Pass verify to main handleKeyDown handler if needed or duplicate logic
-                                // For simplicity let's duplicate the key check for now
-                                if (e.key === "ArrowDown") {
-                                  e.preventDefault();
-                                  setSelectedIndex(
-                                    (prev) => (prev + 1) % mentionResults.length
-                                  );
-                                } else if (e.key === "ArrowUp") {
-                                  e.preventDefault();
-                                  setSelectedIndex(
-                                    (prev) =>
-                                      (prev - 1 + mentionResults.length) %
-                                      mentionResults.length
-                                  );
-                                } else if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  insertMention(mentionResults[selectedIndex]);
-                                } else if (e.key === "Escape") {
-                                  setShowMentionList(false);
-                                }
-                              } else if (e.key === "Enter") {
-                                // Submit comment if not selecting mention
-                                // submitComment(post.id); // Optional: submit on enter
-                              }
-                            }}
-                            onSelect={(e) =>
-                              setCursorPosition(
-                                (e.target as HTMLInputElement).selectionStart ||
-                                  0
-                              )
-                            }
-                          />
-
-                          {/* Comment Mention Dropdown - Mobile Optimized */}
-                          {showMentionList &&
-                            mentionResults.length > 0 &&
-                            mentionTarget === "comment" && (
-                              <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto w-full sm:w-72">
-                                {mentionResults.map(
-                                  (item: any, index: number) => (
+                        {/* Header - Mobile Optimized */}
+                        <div className="flex items-start justify-between mb-3 gap-2">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <Link
+                              to={`/user/${post.user.id || post.user_id || ""}`}
+                              className="shrink-0 touch-manipulation"
+                            >
+                              <div
+                                className="size-9 sm:size-10 rounded-full bg-cover bg-center"
+                                style={{
+                                  backgroundImage: `url('${post.user.avatar}')`,
+                                }}
+                              ></div>
+                            </Link>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <Link
+                                  to={`/user/${
+                                    post.user.id || post.user_id || ""
+                                  }`}
+                                  className="text-slate-900 dark:text-white font-bold text-sm hover:underline active:opacity-70 cursor-pointer truncate touch-manipulation min-h-[44px] flex items-center"
+                                >
+                                  {post.user.name}
+                                </Link>
+                                {post.tag?.type === "watching" && (
+                                  <>
+                                    <span className="text-slate-500 dark:text-text-secondary text-xs sm:text-sm hidden min-[375px]:inline">
+                                      Mencionou a serie
+                                    </span>
                                     <button
-                                      key={item.id}
-                                      onClick={() => insertMention(item)}
-                                      className={`w-full text-left px-3 py-2 flex items-center gap-2 border-b border-gray-100 dark:border-white/5 last:border-0 transition-colors ${
-                                        index === selectedIndex
-                                          ? "bg-primary/10 dark:bg-primary/20"
-                                          : "hover:bg-gray-100 dark:hover:bg-white/10"
-                                      }`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSeriesClick(post.tag!.text);
+                                      }}
+                                      className="text-primary font-bold text-xs sm:text-sm hover:underline cursor-pointer truncate max-w-[120px] sm:max-w-none"
                                     >
-                                      {mentionType === "user" ? (
-                                        <>
-                                          <div
-                                            className="size-6 rounded-full bg-cover bg-center shrink-0"
-                                            style={{
-                                              backgroundImage: `url('${
-                                                item.avatar ||
-                                                "https://placeholder.pics/svg/50"
-                                              }')`,
-                                            }}
-                                          ></div>
-                                          <div className="flex flex-col truncate">
-                                            <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                                              {item.name}
-                                            </span>
-                                            <span className="text-xs text-slate-500 truncate">
-                                              {item.handle}
-                                            </span>
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <div
-                                            className="w-6 h-8 bg-cover bg-center rounded shrink-0"
-                                            style={{
-                                              backgroundImage: `url('${TMDBService.getImageUrl(
-                                                item.poster_path
-                                              )}')`,
-                                            }}
-                                          ></div>
-                                          <div className="flex flex-col truncate">
-                                            <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                                              {item.name || item.title}
-                                            </span>
-                                            <span className="text-xs text-slate-500 truncate">
-                                              {
-                                                item.first_air_date?.split(
-                                                  "-"
-                                                )[0]
-                                              }
-                                            </span>
-                                          </div>
-                                        </>
-                                      )}
+                                      {post.tag.text}
                                     </button>
-                                  )
+                                  </>
+                                )}
+                              </div>
+                              <span className="text-slate-500 dark:text-text-secondary text-[10px] sm:text-xs truncate">
+                                {post.user.handle} • {post.timeAgo}
+                              </span>
+                            </div>
+                          </div>
+                          {post.isSpoiler && (
+                            <span className="bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 px-2 py-0.5 rounded text-xs font-bold uppercase flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">
+                                warning
+                              </span>{" "}
+                              Spoiler
+                            </span>
+                          )}
+                          <div className="relative shrink-0">
+                            {user?.id === post.user_id && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    setActiveMenuId(
+                                      activeMenuId === post.id ? null : post.id
+                                    )
+                                  }
+                                  className="text-slate-500 dark:text-text-secondary active:text-slate-900 dark:active:text-white p-2 -mr-2 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                  aria-label="Mais opções"
+                                >
+                                  <span className="material-symbols-outlined text-xl">
+                                    more_horiz
+                                  </span>
+                                </button>
+                                {activeMenuId === post.id && (
+                                  <div className="absolute right-0 top-10 sm:top-8 bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border rounded-lg shadow-xl z-20 min-w-[140px] overflow-hidden">
+                                    <button
+                                      onClick={() => handleDeletePost(post.id)}
+                                      className="w-full text-left px-4 py-3 text-sm text-red-600 active:bg-red-50 dark:active:bg-red-900/20 flex items-center gap-2 touch-manipulation min-h-[44px]"
+                                    >
+                                      <span className="material-symbols-outlined text-lg">
+                                        delete
+                                      </span>{" "}
+                                      Excluir
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        {post.isSpoiler && !spoilerRevealed[post.id] ? (
+                          <div
+                            onClick={() => toggleSpoiler(post.id)}
+                            className="relative bg-gray-50 dark:bg-black/20 rounded-lg p-3 sm:p-4 text-center border border-dashed border-gray-300 dark:border-surface-border cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group mb-4 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-slate-500 dark:text-text-secondary text-xl sm:text-2xl group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                                visibility_off
+                              </span>
+                              <p className="text-sm text-slate-600 dark:text-text-secondary font-medium group-hover:text-slate-900 dark:group-hover:text-white">
+                                Contém spoilers de{" "}
+                                <strong className="text-slate-900 dark:text-white">
+                                  {post.spoilerTopic || "uma série"}
+                                </strong>
+                              </p>
+                            </div>
+                            <button className="text-primary text-xs sm:text-sm font-bold hover:underline bg-primary/10 px-3 py-1 rounded-full">
+                              Toque para revelar
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            {post.tag?.type === "review" && (
+                              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 leading-tight">
+                                {post.tag.text}
+                              </h3>
+                            )}
+
+                            <PostContent
+                              content={post.content}
+                              onSeriesClick={handleSeriesClick}
+                              onUserClick={handleUserClick}
+                            />
+
+                            {post.image && (
+                              <div className="relative w-full rounded-lg overflow-hidden mb-4 group border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-black">
+                                <LazyImage
+                                  src={post.image}
+                                  alt="Post content"
+                                  className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                                />
+                                {post.tag?.type === "review" && (
+                                  <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1 z-10">
+                                    <span className="material-symbols-outlined text-[14px] text-primary">
+                                      star
+                                    </span>{" "}
+                                    Review
+                                  </div>
                                 )}
                               </div>
                             )}
-                        </div>
-                        <button
-                          onClick={() => submitComment(post.id)}
-                          className="bg-primary active:bg-primary/90 text-white rounded-lg px-4 py-2.5 sm:py-2 text-sm font-bold disabled:opacity-50 touch-manipulation min-h-[44px] whitespace-nowrap"
-                          disabled={!newCommentText.trim()}
-                        >
-                          Enviar
-                        </button>
-                      </div>
-                      <div className="space-y-3">
-                        {loadingComments ? (
-                          <p className="text-center text-xs text-gray-500">
-                            Carregando...
-                          </p>
-                        ) : commentsData[post.id]?.length > 0 ? (
-                          commentsData[post.id].map((comment: any) => (
-                            <div key={comment.id} className="flex gap-2">
-                              <div
-                                className="size-8 rounded-full bg-cover bg-center shrink-0"
-                                style={{
-                                  backgroundImage: `url('${
-                                    comment.author?.avatar ||
-                                    "https://placeholder.pics/svg/50"
-                                  }')`,
-                                }}
-                              ></div>
-                              <div className="flex flex-col">
-                                <div className="bg-white dark:bg-white/10 p-2 rounded-lg rounded-tl-none">
-                                  <span className="font-bold text-xs text-slate-900 dark:text-white block">
-                                    {comment.author?.name}
-                                  </span>
-                                  <PostContent
-                                    content={comment.content}
-                                    onSeriesClick={handleSeriesClick}
-                                    onUserClick={handleUserClick}
-                                  />
-                                </div>
-                                <span className="text-[10px] text-gray-500 mt-0.5 ml-1">
-                                  {new Date(
-                                    comment.created_at
-                                  ).toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-center text-xs text-gray-500">
-                            Seja o primeiro a comentar!
-                          </p>
+                          </>
                         )}
-                      </div>
-                    </div>
-                  )}
-                </article>
-              ))
-            )}
 
-            {/* Infinite scroll trigger */}
-            {hasMore && posts.length > 0 && (
-              <div
-                ref={observerTarget}
-                className="flex justify-center mt-4 mb-4 sm:mb-6 py-4"
-              >
-                {loadingPosts && (
-                  <div className="flex items-center gap-2 text-slate-500 dark:text-text-secondary">
-                    <span className="material-symbols-outlined animate-spin">
-                      progress_activity
-                    </span>
-                    <span className="text-sm">
-                      Carregando mais publicações...
-                    </span>
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-white/5 mt-2">
+                          <div className="flex gap-3 sm:gap-4">
+                            <button
+                              onClick={() => handleLike(post)}
+                              className={`flex items-center gap-1.5 transition-colors touch-manipulation min-h-[44px] px-2 -ml-2 ${
+                                post.userHasLiked
+                                  ? "text-red-500"
+                                  : "text-slate-500 dark:text-text-secondary active:text-red-500"
+                              }`}
+                              aria-label={`${
+                                post.userHasLiked ? "Descurtir" : "Curtir"
+                              } post`}
+                            >
+                              <span
+                                className={`material-symbols-outlined text-lg sm:text-[20px] ${
+                                  post.userHasLiked ? "filled" : ""
+                                }`}
+                              >
+                                favorite
+                              </span>
+                              <span className="text-xs font-bold">
+                                {post.likes}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => toggleComments(post.id)}
+                              className="flex items-center gap-1.5 text-slate-500 dark:text-text-secondary active:text-slate-900 dark:active:text-white transition-colors touch-manipulation min-h-[44px] px-2"
+                              aria-label="Comentar"
+                            >
+                              <span className="material-symbols-outlined text-lg sm:text-[20px]">
+                                chat_bubble
+                              </span>
+                              <span className="text-xs font-bold">
+                                {post.comments}
+                              </span>
+                            </button>
+                            <button
+                              className="flex items-center gap-1.5 text-slate-500 dark:text-text-secondary active:text-slate-900 dark:active:text-white transition-colors touch-manipulation min-h-[44px] px-2"
+                              aria-label="Compartilhar"
+                            >
+                              <span className="material-symbols-outlined text-lg sm:text-[20px]">
+                                share
+                              </span>
+                              <span className="text-xs font-bold">
+                                {post.shares}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Comments Section - Mobile Optimized */}
+                        {activeCommentsPostId === post.id && (
+                          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 p-4 sm:p-5">
+                            <div className="flex gap-2 mb-4">
+                              <div className="relative flex-1">
+                                <input
+                                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 px-3 py-2.5 sm:py-2 text-sm min-h-[44px]"
+                                  placeholder="Escreva um comentário..."
+                                  value={newCommentText}
+                                  onChange={handleCommentInputChange}
+                                  onKeyDown={(e) => {
+                                    if (showMentionList) {
+                                      // Pass verify to main handleKeyDown handler if needed or duplicate logic
+                                      // For simplicity let's duplicate the key check for now
+                                      if (e.key === "ArrowDown") {
+                                        e.preventDefault();
+                                        setSelectedIndex(
+                                          (prev) =>
+                                            (prev + 1) % mentionResults.length
+                                        );
+                                      } else if (e.key === "ArrowUp") {
+                                        e.preventDefault();
+                                        setSelectedIndex(
+                                          (prev) =>
+                                            (prev - 1 + mentionResults.length) %
+                                            mentionResults.length
+                                        );
+                                      } else if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        insertMention(
+                                          mentionResults[selectedIndex]
+                                        );
+                                      } else if (e.key === "Escape") {
+                                        setShowMentionList(false);
+                                      }
+                                    } else if (e.key === "Enter") {
+                                      // Submit comment if not selecting mention
+                                      // submitComment(post.id); // Optional: submit on enter
+                                    }
+                                  }}
+                                  onSelect={(e) =>
+                                    setCursorPosition(
+                                      (e.target as HTMLInputElement)
+                                        .selectionStart || 0
+                                    )
+                                  }
+                                />
+
+                                {/* Comment Mention Dropdown - Mobile Optimized */}
+                                {showMentionList &&
+                                  mentionResults.length > 0 &&
+                                  mentionTarget === "comment" && (
+                                    <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto w-full sm:w-72">
+                                      {mentionResults.map(
+                                        (item: any, index: number) => (
+                                          <button
+                                            key={item.id}
+                                            onClick={() => insertMention(item)}
+                                            className={`w-full text-left px-3 py-2 flex items-center gap-2 border-b border-gray-100 dark:border-white/5 last:border-0 transition-colors ${
+                                              index === selectedIndex
+                                                ? "bg-primary/10 dark:bg-primary/20"
+                                                : "hover:bg-gray-100 dark:hover:bg-white/10"
+                                            }`}
+                                          >
+                                            {mentionType === "user" ? (
+                                              <>
+                                                <div
+                                                  className="size-6 rounded-full bg-cover bg-center shrink-0"
+                                                  style={{
+                                                    backgroundImage: `url('${
+                                                      item.avatar ||
+                                                      "https://placeholder.pics/svg/50"
+                                                    }')`,
+                                                  }}
+                                                ></div>
+                                                <div className="flex flex-col truncate">
+                                                  <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                                    {item.name}
+                                                  </span>
+                                                  <span className="text-xs text-slate-500 truncate">
+                                                    {item.handle}
+                                                  </span>
+                                                </div>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <div
+                                                  className="w-6 h-8 bg-cover bg-center rounded shrink-0"
+                                                  style={{
+                                                    backgroundImage: `url('${TMDBService.getImageUrl(
+                                                      item.poster_path
+                                                    )}')`,
+                                                  }}
+                                                ></div>
+                                                <div className="flex flex-col truncate">
+                                                  <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                                    {item.name || item.title}
+                                                  </span>
+                                                  <span className="text-xs text-slate-500 truncate">
+                                                    {
+                                                      item.first_air_date?.split(
+                                                        "-"
+                                                      )[0]
+                                                    }
+                                                  </span>
+                                                </div>
+                                              </>
+                                            )}
+                                          </button>
+                                        )
+                                      )}
+                                    </div>
+                                  )}
+                              </div>
+                              <button
+                                onClick={() => submitComment(post.id)}
+                                className="bg-primary active:bg-primary/90 text-white rounded-lg px-4 py-2.5 sm:py-2 text-sm font-bold disabled:opacity-50 touch-manipulation min-h-[44px] whitespace-nowrap"
+                                disabled={!newCommentText.trim()}
+                              >
+                                Enviar
+                              </button>
+                            </div>
+                            <div className="space-y-3">
+                              {loadingComments ? (
+                                <p className="text-center text-xs text-gray-500">
+                                  Carregando...
+                                </p>
+                              ) : commentsData[post.id]?.length > 0 ? (
+                                commentsData[post.id].map((comment: any) => (
+                                  <div key={comment.id} className="flex gap-2">
+                                    <div
+                                      className="size-8 rounded-full bg-cover bg-center shrink-0"
+                                      style={{
+                                        backgroundImage: `url('${
+                                          comment.author?.avatar ||
+                                          "https://placeholder.pics/svg/50"
+                                        }')`,
+                                      }}
+                                    ></div>
+                                    <div className="flex flex-col">
+                                      <div className="bg-white dark:bg-white/10 p-2 rounded-lg rounded-tl-none">
+                                        <span className="font-bold text-xs text-slate-900 dark:text-white block">
+                                          {comment.author?.name}
+                                        </span>
+                                        <PostContent
+                                          content={comment.content}
+                                          onSeriesClick={handleSeriesClick}
+                                          onUserClick={handleUserClick}
+                                        />
+                                      </div>
+                                      <span className="text-[10px] text-gray-500 mt-0.5 ml-1">
+                                        {new Date(
+                                          comment.created_at
+                                        ).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-center text-xs text-gray-500">
+                                  Seja o primeiro a comentar!
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    ))}
+                  </>
+                )}
+
+                {/* Infinite scroll trigger - Apenas para posts, não para batalhas */}
+                {feedType !== "battles" && hasMore && posts.length > 0 && (
+                  <div
+                    ref={observerTarget}
+                    className="flex justify-center mt-4 mb-4 sm:mb-6 py-4"
+                  >
+                    {loadingPosts && (
+                      <div className="flex items-center gap-2 text-slate-500 dark:text-text-secondary">
+                        <span className="material-symbols-outlined animate-spin">
+                          progress_activity
+                        </span>
+                        <span className="text-sm">
+                          Carregando mais publicações...
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {!hasMore && posts.length > 0 && (
-              <div className="flex justify-center mt-4 mb-4 sm:mb-6">
-                <p className="text-slate-500 dark:text-text-secondary text-sm">
-                  Você chegou ao fim do feed!
-                </p>
-              </div>
+                {feedType !== "battles" && !hasMore && posts.length > 0 && (
+                  <div className="flex justify-center mt-4 mb-4 sm:mb-6">
+                    <p className="text-slate-500 dark:text-text-secondary text-sm">
+                      Você chegou ao fim do feed!
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -1561,8 +1760,8 @@ const FeedPage: React.FC = () => {
                         style={{
                           backgroundImage: club.image_url
                             ? `url('${club.image_url}')`
-                            : 'none',
-                          backgroundColor: club.color || '#6366f1',
+                            : "none",
+                          backgroundColor: club.color || "#6366f1",
                         }}
                       ></div>
                       <div className="flex flex-col flex-1 min-w-0">
@@ -1570,7 +1769,8 @@ const FeedPage: React.FC = () => {
                           {club.name}
                         </h4>
                         <span className="text-slate-500 dark:text-text-secondary text-xs truncate">
-                          {club.member_count || 0} {club.member_count === 1 ? 'membro' : 'membros'}
+                          {club.member_count || 0}{" "}
+                          {club.member_count === 1 ? "membro" : "membros"}
                         </span>
                       </div>
                       <button
@@ -1742,6 +1942,51 @@ const FeedPage: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Modal Tutorial de Batalhas */}
+      <BattleTutorialModal
+        isOpen={isBattleTutorialOpen}
+        onClose={() => setIsBattleTutorialOpen(false)}
+        onStartCreating={() => setIsCreateBattleModalOpen(true)}
+      />
+
+      {/* Modal Criar Batalha */}
+      <CreateBattleModal
+        isOpen={isCreateBattleModalOpen}
+        onClose={() => setIsCreateBattleModalOpen(false)}
+        onCreate={async (battleData) => {
+          if (!user?.id) {
+            showError(
+              "Você precisa estar logado para criar uma batalha.",
+              "error"
+            );
+            return;
+          }
+
+          try {
+            const newBattle = await BattleService.createBattle(
+              user.id,
+              battleData.topic,
+              battleData.description,
+              battleData.durationHours,
+              battleData.isPublic,
+              battleData.series
+            );
+
+            // Recarregar batalhas para incluir a nova
+            await loadOpinionBattles();
+
+            setIsCreateBattleModalOpen(false);
+            showError("Batalha criada com sucesso!", "success");
+          } catch (error: any) {
+            console.error("Erro ao criar batalha:", error);
+            showError(
+              error?.message || "Erro ao criar batalha. Tente novamente.",
+              "error"
+            );
+          }
+        }}
+      />
     </div>
   );
 };

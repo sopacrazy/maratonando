@@ -26,7 +26,7 @@ export const ProfileService = {
       handle,
       avatar: `https://ui-avatars.com/api/?name=${name}&background=random`,
       bio: 'Novo na comunidade maratonando!',
-      coins: 50,
+      coins: 0,
       profile_theme: 'default'
     };
 

@@ -75,6 +75,22 @@ export const ClubService = {
       const userId = (await supabase.auth.getUser()).data.user?.id;
       if (!userId) throw new Error('Usuário não autenticado');
 
+      // Verificar se já existe um clube com o mesmo nome
+      const trimmedName = name.trim();
+      const { data: existingClub, error: checkError } = await supabase
+        .from('clubes')
+        .select('id, name')
+        .ilike('name', trimmedName)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw new Error('Erro ao verificar nome do clube');
+      }
+
+      if (existingClub) {
+        throw new Error('Já existe um clube com este nome. Por favor, escolha outro nome.');
+      }
+
       let imageUrl = null;
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();

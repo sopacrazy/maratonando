@@ -28,7 +28,7 @@ const ArenaPage = lazy(() => import('./pages/Clubes/Arena'));
 const PageLoader: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center bg-background-light dark:bg-background-dark">
     <div className="text-center">
-      <span className="material-symbols-outlined text-6xl text-primary animate-spin">progress_activity</span>
+      <span className="material-symbols-outlined text-6xl text-primary animate-spin" style={{ fontVariationSettings: '"FILL" 0' }}>progress_activity</span>
       <p className="mt-4 text-slate-600 dark:text-text-secondary font-medium">Carregando...</p>
     </div>
   </div>
@@ -43,7 +43,7 @@ export const AppContext = React.createContext<{
   updateUser: (updates: Partial<User>) => void;
   addSeriesReview: (review: SeriesReview) => void;
 }>({
-  coins: 2450,
+  coins: 0,
   setCoins: () => { },
   theme: 'light',
   toggleTheme: () => { },
@@ -53,7 +53,7 @@ export const AppContext = React.createContext<{
 });
 
 export default function App() {
-  const [coins, setCoins] = useState(2450);
+  const [coins, setCoins] = useState(0);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   // Estado do Usuário Logado com dados iniciais
@@ -80,7 +80,7 @@ export default function App() {
                 id: session.user.id, // Ensure ID is set
                 profileTheme: profile.profile_theme // Map database snake_case to camelCase
               }));
-              setCoins(profile.coins || 2450);
+              setCoins(profile.coins || 0);
             }
           })
           .catch(err => {
@@ -107,7 +107,7 @@ export default function App() {
               id: session.user.id, // Explicitly set ID
               profileTheme: profile.profile_theme // Map theme
             }));
-            setCoins(profile.coins || 2450);
+            setCoins(profile.coins || 0);
           }
         });
       } else {

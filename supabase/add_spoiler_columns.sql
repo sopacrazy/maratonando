@@ -14,3 +14,4 @@ COMMENT ON COLUMN public.posts.spoiler_topic IS 'Tópico/série sobre a qual o s
 
 
 
+
